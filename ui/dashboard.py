@@ -4,6 +4,7 @@ from services.drive_service import DriveService
 import re
 import json
 import os
+from ui.custom_control.custom_controls import ButtonWithMenu
 
 FAVORITES_FILE = "favorites.json"
 
@@ -641,6 +642,26 @@ class Dashboard:
         self.auth.logout()
         self.on_logout()
 
+
+    def handle_action(self, selected_item):
+        print(f"User selected: {selected_item}")
+        self.page.snack_bar = ft.SnackBar(ft.Text(f"Selected: {selected_item}"))
+        if selected_item == "Edit":
+            print("Edit")
+        elif selected_item == "Delete":
+            print("Delete")
+        elif selected_item == "Share":
+            print("Share")
+        elif selected_item == "Export":
+            print("Export")
+        elif selected_item == "Create Folder":
+            print("Create Folder")
+        elif selected_item == "Upload File":
+            print("Upload File")
+            self.select_file_to_upload()
+        self.page.snack_bar.open = True
+        self.page.update()
+
     def get_view(self):
     # ---- LEFT SIDEBAR ----
         sidebar = ft.Container(
@@ -649,52 +670,13 @@ class Dashboard:
             padding=20,
             content=ft.Column(
                 controls=[
-                    ft.ElevatedButton(
-                        "+ NEW",
-                        on_click=self.show_new_menu,
-                        style=ft.ButtonStyle(
-                            padding=20,
-                            bgcolor=ft.Colors.WHITE,
-                            color=ft.Colors.BLACK,
-                            shape=ft.RoundedRectangleBorder(radius=10),
-                        ),
-                        expand=False,
+                    ButtonWithMenu(
+                        text="+ NEW",
+                        menu_items=["Edit", "Delete", "Share", "Export", "Create Folder", "Upload File"],
+                        on_menu_select= self.handle_action,
+                        # on_click=self.show_new_menu,
                     ),
-                    ft.PopupMenuButton(
-                        
-                        items=[
-                            ft.PopupMenuItem(
-                                content=ft.Text("New Folder"),
-                                on_click=lambda e: self.create_new_folder_dialog()
-                            ),
-                            ft.PopupMenuItem(
-                                content=ft.Text("Upload File"),
-                                on_click=lambda e: self.select_file_to_upload()
-                            ),
-                        ],
-                        content=ft.ElevatedButton(
-                            "Paste a Link",
-                            on_click=lambda e: None,
-                            style=ft.ButtonStyle(
-                                padding=20,
-                                bgcolor=ft.Colors.WHITE,
-                                color=ft.Colors.BLACK,
-                                shape=ft.RoundedRectangleBorder(radius=10),
-                            )
-                        ),
-                        expand=False,
-                    ),
-                    # ft.ElevatedButton(
-                    #     "Paste a Link",
-                    #     on_click=self.paste_link_dialog,
-                    #     style=ft.ButtonStyle(
-                    #         padding=20,
-                    #         bgcolor=ft.Colors.GREY_200,
-                    #         color=ft.Colors.BLACK,
-                    #         shape=ft.RoundedRectangleBorder(radius=10),
-                    #     ),
-                    #     expand=False,
-                    # ),
+
                     ft.Container(height=20),
                     ft.ElevatedButton(
                         "SETTINGS",
