@@ -1,17 +1,16 @@
 import flet as ft
 
-
 class ButtonWithMenu(ft.PopupMenuButton):
     """Custom PopupMenuButton styled to look like an ElevatedButton"""
     
-    def __init__(self, text, menu_items, on_menu_select=None, **kwargs):
-        # Create popup menu items
+    def __init__(self, text, menu_items, on_menu_select=None, page=None, **kwargs):
+        self.page = page  # <-- IMPORTANT FIX
+
         popup_items = [
             ft.PopupMenuItem(text=item, on_click=self._handle_menu_click)
             for item in menu_items
         ]
         
-        # Create button-like content that matches ElevatedButton style
         self.button_content = ft.Container(
             content=ft.Row(
                 [
@@ -44,9 +43,7 @@ class ButtonWithMenu(ft.PopupMenuButton):
         self.on_menu_select = on_menu_select
     
     def _on_hover(self, e):
-        """Handle hover effect"""
         if e.data == "true":
-            # Hover in - make it slightly elevated
             self.button_content.shadow = ft.BoxShadow(
                 spread_radius=0,
                 blur_radius=8,
@@ -55,7 +52,6 @@ class ButtonWithMenu(ft.PopupMenuButton):
             )
             self.button_content.scale = 1.02
         else:
-            # Hover out - return to normal
             self.button_content.shadow = ft.BoxShadow(
                 spread_radius=0,
                 blur_radius=2,
@@ -67,7 +63,7 @@ class ButtonWithMenu(ft.PopupMenuButton):
         self.button_content.update()
     
     def _handle_menu_click(self, e):
-        """Handle menu item selection"""
+        print("MENU CLICKED:", e.control.text)
+        print("CALLING on_menu_select:", self.on_menu_select)
         if self.on_menu_select:
             self.on_menu_select(e.control.text)
-

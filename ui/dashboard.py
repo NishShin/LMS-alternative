@@ -390,24 +390,43 @@ class Dashboard:
         def create(e):
             folder_name = name_field.value.strip()
             if folder_name:
-                created = self.drive.create_folder(folder_name, parent_id=self.current_folder_id)
-                if created:
+                folder = self.drive.create_folder(folder_name, parent_id=self.current_folder_id)
+                if folder:
+                    print("Created folder:", folder)
                     self.refresh_folder_contents()
-            dialog.open = False
+                else:
+                    print("Failed to create folder")
+            # remove overlay
+            self.page.overlay.pop()
             self.page.update()
 
-        dialog = ft.AlertDialog(
-            title=ft.Text("Create New Folder"),
-            content=name_field,
-            actions=[
-                ft.TextButton("Cancel", on_click=lambda e: self.close_dialog(dialog)),
-                ft.ElevatedButton("Create", on_click=create)
-            ]
+        dialog_container = ft.Container(
+            content=ft.Column(
+                [
+                    ft.Text("Create New Folder"),
+                    name_field,
+                    ft.Row(
+                        [
+                            ft.TextButton("Cancel", on_click=lambda e: self.page.overlay.pop()),
+                            ft.ElevatedButton("Create", on_click=create),
+                        ],
+                        alignment=ft.MainAxisAlignment.END,
+                        spacing=10,
+                    )
+                ],
+                spacing=10,
+            ),
+            padding=20,
+            bgcolor=ft.Colors.WHITE,
+            border_radius=10,
+            width=300,
+            height=150,
         )
 
-        self.page.dialog = dialog
-        dialog.open = True
+        self.page.overlay.append(dialog_container)
         self.page.update()
+
+
 
 
     def select_file_to_upload(self):
@@ -645,22 +664,21 @@ class Dashboard:
 
     def handle_action(self, selected_item):
         print(f"User selected: {selected_item}")
+        print("HANDLE_ACTION CALLED with:", selected_item)
+        print("PAGE in handle_action =", self.page)
         self.page.snack_bar = ft.SnackBar(ft.Text(f"Selected: {selected_item}"))
-        if selected_item == "Edit":
-            print("Edit")
-        elif selected_item == "Delete":
-            print("Delete")
-        elif selected_item == "Share":
-            print("Share")
-        elif selected_item == "Export":
-            print("Export")
-        elif selected_item == "Create Folder":
+
+        if selected_item == "Create Folder":
+            
+            self.create_new_folder_dialog()
             print("Create Folder")
         elif selected_item == "Upload File":
             print("Upload File")
             self.select_file_to_upload()
+        
         self.page.snack_bar.open = True
         self.page.update()
+
 
     def get_view(self):
     # ---- LEFT SIDEBAR ----
@@ -672,9 +690,10 @@ class Dashboard:
                 controls=[
                     ButtonWithMenu(
                         text="+ NEW",
-                        menu_items=["Edit", "Delete", "Share", "Export", "Create Folder", "Upload File"],
+                        menu_items=[ "Create Folder", "Upload File"],
                         on_menu_select= self.handle_action,
                         # on_click=self.show_new_menu,
+                        page=self.page
                     ),
 
                     ft.Container(height=20),

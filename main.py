@@ -4,6 +4,8 @@ from ui.login import LoginView
 from services.auth_service import GoogleAuth
 
 def main(page: ft.Page):
+    page.window_always_on_top = True
+
     page.title = "Google Drive Folder Manager"
     page.theme_mode = ft.ThemeMode.LIGHT
     page.padding = 0
