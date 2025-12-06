@@ -205,25 +205,25 @@ class DriveService:
         patterns = [
             r"/folders/([a-zA-Z0-9_-]+)",
             r"/file/d/([a-zA-Z0-9_-]+)",
-            r"[?&]id=([a-zA-Z0-9_-]+)"  # Fixed: added [?&] for proper matching
+            r"[?&]id=([a-zA-Z0-9_-]+)"  
         ]
         
         for file in files:
-            print(f"DEBUG: Checking link: {file}")  # Debug
+            print(f"DEBUG: Checking link: {file}")  
             for pattern in patterns:
                 match = re.search(pattern, file)
                 if match:
                     extracted_id = match.group(1)
-                    print(f"DEBUG: Extracted ID: {extracted_id}")  # Debug
+                    print(f"DEBUG: Extracted ID: {extracted_id}")  
                     return extracted_id
         
-        print("DEBUG: No ID found in link")  # Debug
+        print("DEBUG: No ID found in link")  
         return None
         
 
     def resolve_drive_link(self, link):
         
-        print(f"DEBUG: resolve_drive_link called with: {link}")  # Debug
+        print(f"DEBUG: resolve_drive_link called with: {link}")  
         
         file_id = self.extract_id_from_link([link])
         
@@ -231,7 +231,7 @@ class DriveService:
             print(f"Could not extract file ID from link: {link}")
             return None, None
         
-        print(f"DEBUG: File ID extracted: {file_id}")  # Debug
+        print(f"DEBUG: File ID extracted: {file_id}")  
         
         info = self.get_file_info(file_id)
         
@@ -239,7 +239,7 @@ class DriveService:
             print(f"Could not retrieve file info for ID: {file_id}")
             return None, None
         
-        print(f"DEBUG: File info retrieved: {info.get('name')}")  # Debug
+        print(f"DEBUG: File info retrieved: {info.get('name')}")  
         return file_id, info
 
 

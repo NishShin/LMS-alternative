@@ -1,6 +1,5 @@
 import flet as ft
 from services.drive_service import DriveService
-import re
 import json
 import os
 from ui.custom_control.custom_controls import ButtonWithMenu
@@ -42,11 +41,10 @@ class Dashboard:
             focused_border_color=ft.Colors.BLUE_700,
         )
 
-        print("DEBUG: Dashboard initialized")  
+         
 
         self.favorites = self.load_favorites()
         self.folder_list = ft.Column(spacing=0, scroll=ft.ScrollMode.ALWAYS, expand=True)
-        self.main_view_container = None
 
         self.page.title = "Drive Manager"
         self.page.vertical_alignment = ft.MainAxisAlignment.START
@@ -188,20 +186,23 @@ class Dashboard:
         self.page.update()
 
     def show_folder_contents(self, folder_id, folder_name=None, is_shared_drive=False, push_to_stack=True):
-        self.current_view = "folder_detail"
+        
         display_name = folder_name or folder_id
 
-        if push_to_stack:
+        if push_to_stack and self.current_folder_id != folder_id:
             self.folder_stack.append((self.current_folder_id, self.current_folder_name))
 
         self.current_folder_id = folder_id
         self.current_folder_name = display_name
 
         self.folder_list.controls.clear()
+
         back_controls = []
 
-        if self.folder_stack or folder_id != "root":
-            back_controls.append(ft.IconButton(icon=ft.Icons.ARROW_BACK, on_click=lambda e: self.go_back()))
+        if self.folder_stack:
+            back_controls.append(
+                ft.IconButton(icon=ft.Icons.ARROW_BACK, on_click=lambda e: self.go_back())
+            )
 
         back_btn = ft.Row(
             [
@@ -214,19 +215,22 @@ class Dashboard:
             ],
             alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
         )
+
         self.folder_list.controls.append(back_btn)
 
+        # Loading indicator
         loading_indicator = ft.Row([
             ft.ProgressRing(width=20, height=20),
             ft.Text("Loading folder contents...", size=14)
         ])
-
         self.folder_list.controls.append(loading_indicator)
         self.page.update()
 
+        # Load folder contents
         try:
             result = self.drive.list_files(folder_id, page_size=200, use_cache=False)
             self.folder_list.controls.remove(loading_indicator)
+
             if result is None:
                 self.folder_list.controls.append(ft.Text("Network error", color=ft.Colors.ORANGE))
             else:
@@ -241,6 +245,7 @@ class Dashboard:
 
         self.page.update()
 
+
     def refresh_folder_contents(self):
         self.drive._invalidate_cache(self.current_folder_id)
         self.show_folder_contents(self.current_folder_id, self.current_folder_name, push_to_stack=False)
@@ -253,7 +258,12 @@ class Dashboard:
         self.current_folder_name = fname
 
         if fid == "root":
-            self.load_your_folders()
+            if self.current_view == "your_folders":
+                self.load_your_folders()
+            elif self.current_view == "paste_links":
+                self.load_paste_links_view()
+            elif self.current_view == "shared_drives":
+                self.load_shared_drives()
         else:
             self.show_folder_contents(fid, fname, push_to_stack=False)
 
@@ -495,10 +505,34 @@ class Dashboard:
             padding=10
         )
 
+        button = ft.Container(
+            content=ft.ResponsiveRow(
+                [
+                    ft.TextButton(
+                        "Cancel",
+                        on_click=lambda e: self.close_dialog(dialog),
+                        col={"md": 4},
+                    ),
+                    ft.ElevatedButton(
+                        "Open Link",
+                        on_click= self.handle_paste_link,
+                        bgcolor=ft.Colors.BLUE_400,
+                        color=ft.Colors.WHITE,
+                        col={"md": 4},
+                    ),
+                ],
+                run_spacing={"xs": 10},
+                alignment=ft.MainAxisAlignment.CENTER, 
+            ),
+            alignment=ft.alignment.center,
+        )
+
+
         paste_section = ft.Container(
             content=ft.Column([
                 ft.Text("Paste a Google Drive folder or file link:" , size=14),
                 self.paste_link_field,
+                button,
                 ft.Text(
                     "Supported formats:\n"
                     "• https://drive.google.com/drive/folders/FOLDER_ID\n"
@@ -580,15 +614,15 @@ class Dashboard:
         self.page.update()
 
     def handle_paste_link(self, e):
-        link = e.control.value.strip()
-        print(f"DEBUG: handle_paste_link called with: {link}")  # Debug
+        link = link = self.paste_link_field.value.strip()
+        print(f"DEBUG: handle_paste_link called with: {link}")  
 
         if not link:
             print("DEBUG: Empty link")
             return
         
         loading_snack = ft.SnackBar(
-            content=ft.Text("🔄 Loading Drive link..."),
+            content=ft.Text("Loading Drive link..."),
             open=True
         )
         self.page.snack_bar = loading_snack
@@ -627,7 +661,7 @@ class Dashboard:
             if mime_type == "application/vnd.google-apps.folder":
                 
                 success_snack = ft.SnackBar(
-                    content=ft.Text(f"✅ Opening folder: {name}"),
+                    content=ft.Text(f"Opening folder: {name}"),
                     bgcolor=ft.Colors.GREEN_400,
                     open=True
                 )
@@ -637,7 +671,7 @@ class Dashboard:
             else:
 
                 info_snack = ft.SnackBar(
-                    content=ft.Text(f"📄 File detected: {name}"),
+                    content=ft.Text(f"File detected: {name}"),
                     bgcolor=ft.Colors.BLUE_400,
                     open=True
                 )
@@ -650,7 +684,7 @@ class Dashboard:
         except Exception as ex:
             print(f"ERROR: Exception in handle_paste_link: {ex}")
             error_snack = ft.SnackBar(
-                content=ft.Text(f"❌ Error: {str(ex)}"),
+                content=ft.Text(f"Error: {str(ex)}"),
                 bgcolor=ft.Colors.RED_400,
                 open=True
             )
@@ -661,104 +695,7 @@ class Dashboard:
 
         self.page.update()
 
-    def quick_paste_dialog(self):
-        print("DEBUG: quick_paste_dialog called")  
-
-        link_field = ft.TextField(
-            hint_text="Paste your Google Drive link here...",
-            autofocus=True,
-            multiline=False,
-            width=500
-        )
-
-        status_text = ft.Text("", size=12)
-
-        dialog = None
-
-        def open_link(e):
-            print(f"DEBUG: open_link called")  
-            link = link_field.value.strip()
-            print(f"DEBUG: Link value: {link}")  
-
-            if not link:
-                status_text.value = "Please paste a link"
-                status_text.color = ft.Colors.ORANGE
-                self.page.update()
-                return
-
-            status_text.value = "Loading..."
-            status_text.color = ft.Colors.BLUE
-            self.page.update()
-
-            try:
-                file_id, info = self.drive.resolve_drive_link(link)
-                print(f"DEBUG: Got file_id={file_id}, info={info}")  
-
-                if file_id and info:
-                    mime_type = info.get("mimeType", "")
-                    name = info.get("name", "Shared Item")
-
-                    print(f"DEBUG: Opening {mime_type}: {name}")  
-
-
-                    try:
-                        self.add_saved_link(file_id, info, link)
-                    except Exception as ex:
-                        print(f"ERROR: Failed to save link from quick dialog: {ex}")
-
-                    if dialog:
-                        dialog.open = False
-                        self.page.update()
-
-                    if mime_type == "application/vnd.google-apps.folder":
-                        self.show_folder_contents(file_id, name)
-                    else:
-                        self.show_file_info(info)
-                else:
-                    status_text.value = "Invalid or inaccessible link. Check permissions!"
-                    status_text.color = ft.Colors.RED
-                    self.page.update()
-            except Exception as ex:
-                print(f"ERROR: Exception in open_link: {ex}")  
-                status_text.value = f"Error: {str(ex)}"
-                status_text.color = ft.Colors.RED
-                self.page.update()
-
-        dialog = ft.AlertDialog(
-            title=ft.Text("Paste Google Drive Link"),
-            content=ft.Container(
-                content=ft.Column([
-                    ft.Text("Paste any Google Drive folder or file link:"),
-                    link_field,
-                    status_text,
-                    ft.Container(height=10),
-                    ft.Text(
-                        "Examples:\n"
-                        "• https://drive.google.com/drive/folders/1ABC...\n"
-                        "• https://drive.google.com/file/d/1XYZ.../view",
-                        size=11,
-                        color=ft.Colors.GREY_600
-                    )
-                ], spacing=10, tight=True),
-                width=500
-            ),
-            actions=[
-                ft.TextButton("Cancel", on_click=lambda e: self.close_dialog(dialog)),
-                ft.ElevatedButton(
-                    "Open Link",
-                    on_click=open_link,
-                    bgcolor=ft.Colors.BLUE_400,
-                    color=ft.Colors.WHITE
-                )
-            ]
-        )
-
-        self.page.dialog = dialog
-        dialog.open = True
-        self.page.update()
-        print("DEBUG: Quick paste dialog opened and displayed")  
-
-
+    
     def open_save_favorite_dialog(self):
         subject_field = ft.TextField(label="Subject / Category", autofocus=True)
 
@@ -819,6 +756,11 @@ class Dashboard:
                 content=ft.Row([
                     ft.Icon(icon, size=20),
                     ft.Text(item["name"], expand=True),
+                    ft.IconButton(
+                    icon=ft.Icons.DELETE,
+                    tooltip="Delete",
+                    on_click=lambda e, it=item: self.delete_saved_link(it)
+                )
                 ]),
                 padding=8,
                 ink=True,
@@ -827,26 +769,6 @@ class Dashboard:
                 border_radius=8
             )
 
-            col.controls.append(row)
-
-        return col
-
-        for item in saved:
-            row = ft.Row([
-                ft.Text(item.get("name", item.get("id")), expand=True),
-
-                ft.IconButton(
-                    icon=ft.Icons.OPEN_IN_NEW,
-                    tooltip="Open",
-                    on_click=lambda e, it=item: self.open_saved_link(it)
-                ),
-
-                ft.IconButton(
-                    icon=ft.Icons.DELETE,
-                    tooltip="Delete",
-                    on_click=lambda e, it=item: self.delete_saved_link(it)
-                )
-            ])
             col.controls.append(row)
 
         return col
@@ -898,15 +820,6 @@ class Dashboard:
                     on_menu_select=self.handle_action,
                     page=self.page
                 ),
-                ft.Container(height=20),
-                
-                ft.ElevatedButton(
-                    "📋 PASTE LINK",
-                    icon=ft.Icons.CONTENT_PASTE,
-                    on_click=lambda e: (print("DEBUG: Paste button clicked"), self.quick_paste_dialog()),
-                    bgcolor=ft.Colors.BLUE_400,
-                    color=ft.Colors.WHITE
-                ),
                 ft.ElevatedButton("SETTINGS", on_click=lambda e: None),
                 ft.ElevatedButton("TO-DO", on_click=lambda e: DriveService.open_shared_link(self)),
                 ft.ElevatedButton("ACCOUNT", on_click=self.handle_logout),
@@ -940,7 +853,9 @@ class Dashboard:
                     "SHARED DRIVES",
                     on_click=lambda e: (print("DEBUG: SHARED DRIVES clicked"), self.load_shared_drives()),
                 ),
-            ], spacing=10)
+            ], 
+            spacing=10,
+            alignment=ft.MainAxisAlignment.CENTER)
         )
 
         main_content = ft.Column([
