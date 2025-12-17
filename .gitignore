@@ -216,6 +216,8 @@ __marimo__/
 .streamlit/secrets.toml
 
 credentials.json
+android_credentials.json
+web.json
 token.pickle
 test/
 local_only/

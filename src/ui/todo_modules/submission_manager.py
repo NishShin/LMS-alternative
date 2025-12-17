@@ -10,8 +10,8 @@ class SubmissionManager:
         self.temp_file_name = None
         
         try:
-            from ui.todo_modules.file_preview import FilePreview
-            self.file_preview = FilePreview(todo_view.page, todo_view.drive_service)
+            from services.file_preview_service import FilePreviewService
+            self.file_preview = FilePreviewService(todo_view.page, todo_view.drive_service)
         except ImportError:
             self.file_preview = None
     
@@ -20,7 +20,6 @@ class SubmissionManager:
             return None, "No timing data"
         
         try:
-
             if 'T' in submitted_at_str:
                 submitted_at = datetime.datetime.fromisoformat(submitted_at_str)
             else:
@@ -273,7 +272,6 @@ class SubmissionManager:
 
                 def make_save_grade_handler(submission, grade_field_ref, feedback_field_ref, status_text_ref):
                     def save_grade(e):
-
                         original_text = e.control.text
                         
                         e.control.disabled = True
@@ -283,10 +281,8 @@ class SubmissionManager:
                         self.todo.page.update()
                         
                         try:
-
                             submission['grade'] = grade_field_ref.value
                             submission['feedback'] = feedback_field_ref.value
-                            
                             
                             submission['graded_at'] = datetime.datetime.now().strftime('%Y-%m-%d %H:%M')
                             
@@ -294,7 +290,10 @@ class SubmissionManager:
 
                             if self.todo.notification_service and grade_field_ref.value:
                                 self.todo.notification_service.notify_grade_posted(
-                                    assignment, submission['student_email'], grade_field_ref.value
+                                    assignment, 
+                                    submission['student_email'], 
+                                    grade_field_ref.value,
+                                    feedback_field_ref.value
                                 )
 
                             status_text_ref.value = "Saved successfully!"
@@ -384,10 +383,8 @@ class SubmissionManager:
                         padding=ft.padding.only(top=5)
                     )
                 
-                
                 button_text = "Update Grade" if sub.get('grade') else "Save Grade"
                 button_icon = ft.Icons.UPDATE if sub.get('grade') else ft.Icons.SAVE
-                
                 
                 edit_hint = ft.Container(
                     content=ft.Row([

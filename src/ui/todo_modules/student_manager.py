@@ -187,9 +187,7 @@ class StudentManager:
         return True, ""
     
     def get_bridging_students(self):
-        """Get list of bridging students"""
         return [s for s in self.todo.students if s.get('is_bridging', False)]
     
     def get_regular_students(self):
-        """Get list of regular students"""
         return [s for s in self.todo.students if not s.get('is_bridging', False)]
