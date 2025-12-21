@@ -142,7 +142,7 @@ class LoginView(ft.Column):
                 self.status_text.color = ft.Colors.RED_600
                 self.login_button.disabled = False
                 self.page.update()
-                print(f"❌ Desktop login error: {ex}")
+                print(f"Desktop login error: {ex}")
                 print(f"Traceback:\n{traceback.format_exc()}")
 
         else:

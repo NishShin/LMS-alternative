@@ -24,14 +24,9 @@ class FirebaseMobileLogin(ft.Column):
         self.session_id = None
         self.polling = False
         
-        self.firebase_db_url = firebase_config.get('databaseURL')
-        if not self.firebase_db_url:
-            self.firebase_db_url = f"https://{firebase_config['projectId']}-default-rtdb.firebaseio.com"
-        
         self._build_ui()
 
     def _build_ui(self):
-        
         self.controls.append(ft.Container(height=50))
         self.controls.append(
             ft.Icon(
@@ -52,7 +47,7 @@ class FirebaseMobileLogin(ft.Column):
         
         self.controls.append(
             ft.Text(
-                "Powered by Firebase",
+                "Mobile Login",
                 size=16,
                 color=ft.Colors.GREY_700,
                 text_align=ft.TextAlign.CENTER
@@ -66,6 +61,14 @@ class FirebaseMobileLogin(ft.Column):
         )
         self.controls.append(ft.Container(height=20))
         self.controls.append(self.status_text)
+        
+        self.debug_text = ft.Text(
+            "",
+            size=10,
+            color=ft.Colors.GREY_500,
+            text_align=ft.TextAlign.CENTER
+        )
+        self.controls.append(self.debug_text)
         
         self.login_button = ft.ElevatedButton(
             text="Sign in with Google",
@@ -85,15 +88,9 @@ class FirebaseMobileLogin(ft.Column):
         self.controls.append(self.progress)
 
     def handle_login(self, e):
-        print(f"\n{'='*60}")
-        print(f"Firebase OAuth login initiated")
-        print(f"{'='*60}")
-
         self.session_id = secrets.token_urlsafe(16)
-        print(f"Session ID: {self.session_id}")
-        print(f"Firebase DB URL: {self.firebase_db_url}")
         
-        self.status_text.value = f"📱 SESSION ID:\n{self.session_id}\n\nOpening browser..."
+        self.status_text.value = f"Opening browser..."
         self.status_text.color = ft.Colors.ORANGE
         self.status_text.size = 16
         self.status_text.weight = ft.FontWeight.BOLD
@@ -101,15 +98,13 @@ class FirebaseMobileLogin(ft.Column):
         self.progress.visible = True
         self.page.update()
         
-        time.sleep(3)
+        time.sleep(2)
         
         try:
-            callback_page_url = self._create_callback_page_url()
-            
             auth_url = "https://accounts.google.com/o/oauth2/v2/auth"
             params = {
                 'client_id': self.oauth_client_id,
-                'redirect_uri': callback_page_url,
+                'redirect_uri': 'https://lms-callback-git-main-astrallibertads-projects.vercel.app/callback.html',
                 'response_type': 'token',
                 'scope': 'openid email profile https://www.googleapis.com/auth/drive',
                 'state': self.session_id
@@ -117,152 +112,123 @@ class FirebaseMobileLogin(ft.Column):
             
             oauth_url = f"{auth_url}?{urllib.parse.urlencode(params)}"
             
-            print(f"✓ OAuth URL created")
-            print(f"✓ Session ID in URL: {self.session_id}")
-            print(f"✓ Callback page: {callback_page_url}")
-            print(f"✓ Full OAuth URL: {oauth_url[:150]}...")
-            
-            self.status_text.value = "Opening browser...\n\nAfter signing in,\nclose browser and return here"
+            self.status_text.value = "Opening browser...\n\nSign in and return to app"
             self.page.update()
             
             time.sleep(1)
             
-            print(f"→ Launching browser...")
             self.page.launch_url(oauth_url)
-            print(f"✓ Browser launched")
             
-            self.status_text.value = "✓ Browser opened!\n\nWaiting for sign-in...\n(Auto-detecting)"
+            self.status_text.value = "✓ Browser opened!\n\nWaiting for sign-in..."
             self.status_text.color = ft.Colors.BLUE_600
+            self.debug_text.value = f"Session: {self.session_id[:8]}..."
             self.page.update()
             
             self._start_polling()
             
         except Exception as ex:
-            import traceback
-            print(f"❌ Error: {ex}")
-            print(f"Traceback:\n{traceback.format_exc()}")
             self.status_text.value = f"❌ Error:\n{str(ex)[:100]}"
             self.status_text.color = ft.Colors.RED_600
             self.login_button.disabled = False
             self.progress.visible = False
             self.page.update()
     
-    def _create_callback_page_url(self):
-        return f"https://lms-callback.vercel.app/firebase_callback_v2.html"
+    def _log(self, msg):
+        try:
+            self.page.run_task(self._update_debug, msg)
+        except:
+            pass
+    
+    async def _update_debug(self, msg):
+        self.debug_text.value = msg
+        self.page.update()
     
     def _start_polling(self):
-        import threading
-        
         self.polling = True
         
         def poll():
             max_attempts = 60
             attempt = 0
             
-            self.page.run_task(self._show_polling_started)
-            
             while self.polling and attempt < max_attempts:
                 self.page.run_task(self._update_waiting_status, attempt)
                 
                 try:
-                    check_url = f"{self.firebase_db_url}/oauth_sessions/{self.session_id}.json"
-                    print(f"→ Polling Firebase attempt {attempt + 1}/{max_attempts}")
-                    print(f"  Session ID: {self.session_id}")
-                    print(f"  Firebase DB URL: {self.firebase_db_url}")
-                    print(f"  Full check URL: {check_url}")
+                    check_url = f"https://lms-callback.vercel.app/api/token/{self.session_id}"
+                    
+                    self._log(f"Check #{attempt+1}/60")
                     
                     req = urllib.request.Request(check_url)
+                    req.add_header('Accept', 'application/json')
+                    
                     try:
-                        with urllib.request.urlopen(req, timeout=5) as response:
+                        with urllib.request.urlopen(req, timeout=10) as response:
                             response_text = response.read().decode('utf-8')
-                            status_code = response.status
+                            data = json.loads(response_text)
                             
-                            try:
-                                with open('/storage/emulated/0/Download/firebase_debug.txt', 'a') as f:
-                                    f.write(f"\n\n=== Attempt {attempt + 1} ===\n")
-                                    f.write(f"Status: {status_code}\n")
-                                    f.write(f"Response: {response_text}\n")
-                            except:
-                                pass
-                                
+                            if data.get('success') and data.get('token'):
+                                token_info = data['token']
+                                if token_info.get('access_token'):
+                                    self._log(f"✓ Token found!")
+                                    self.page.run_task(self._handle_tokens, token_info)
+                                    return
+                            
+                            self._log(f"Check #{attempt+1}: Waiting...")
+                            
                     except urllib.error.HTTPError as he:
-                        status_code = he.code
-                        response_text = ""
-                        print(f"  HTTP Error: {status_code}")
-                    
-                    print(f"  Response status: {status_code}")
-                    print(f"  Response text length: {len(response_text)}")
-                    print(f"  Response preview: {response_text[:200] if response_text else 'empty'}")
-                    
-                    if status_code == 200:
-                        data = json.loads(response_text) if response_text and response_text != 'null' else None
-                        
-                        if data and isinstance(data, dict) and 'access_token' in data:
-                            print(f"✓ Tokens found in Firebase!")
-                            
-                            print(f"  Deleting session from Firebase...")
-                            try:
-                                del_req = urllib.request.Request(check_url, method='DELETE')
-                                urllib.request.urlopen(del_req)
-                            except Exception as del_err:
-                                print(f"  Warning: Could not delete session: {del_err}")
-                            
-                            self.page.run_task(self._handle_tokens, data)
-                            return
+                        if he.code == 404:
+                            self._log(f"Check #{attempt+1}: Not ready")
                         else:
-                            print(f"  No tokens yet (data is null or missing access_token)")
+                            self._log(f"Check #{attempt+1}: HTTP {he.code}")
+                            
+                    except Exception as conn_err:
+                        self._log(f"Check #{attempt+1}: Connection issue")
                     
                     time.sleep(5)
                     attempt += 1
                     
                 except Exception as e:
-                    print(f"⚠ Polling error: {e}")
+                    self._log(f"Check #{attempt+1}: Error")
                     time.sleep(5)
                     attempt += 1
             
             if attempt >= max_attempts:
-                print(f"⏱ Polling timeout")
                 self.page.run_task(self._handle_timeout)
         
         thread = threading.Thread(target=poll, daemon=True)
         thread.start()
     
-    async def _show_firebase_response(self, response_preview, data):
-        has_token = "YES" if (data and isinstance(data, dict) and 'access_token' in data) else "NO"
-        self.status_text.value = f"📱 SESSION: {self.session_id[:10]}...\n\n🔍 FIREBASE SAYS:\n{response_preview}\n\nHas token? {has_token}"
-        self.status_text.size = 12
-        self.page.update()
-    
-    async def _show_polling_started(self):
-        self.status_text.value = f"📱 SESSION: {self.session_id}\n\n🔄 POLLING STARTED\nCheck #1/60"
-        self.page.update()
-    
     async def _update_waiting_status(self, attempt):
         dots = "." * ((attempt % 3) + 1)
-        self.status_text.value = f"📱 SESSION: {self.session_id}\n\nWaiting for sign-in{dots}\nCheck #{attempt + 1}/60"
+        self.status_text.value = f"Waiting for sign-in{dots}\nCheck #{attempt + 1}/60"
         self.status_text.size = 14
         self.status_text.weight = ft.FontWeight.NORMAL
         self.page.update()
     
     async def _handle_tokens(self, tokens):
-        print(f"→ Processing tokens from Firebase...")
-        
         self.polling = False
         
-        self.status_text.value = "✓ Signed in!\n\nProcessing authentication..."
+        self.status_text.value = "✓ Token received!\n\nAuthenticating..."
         self.status_text.color = ft.Colors.GREEN_600
+        self.debug_text.value = "Processing..."
         self.page.update()
         
         token_data = {
             'access_token': tokens.get('access_token'),
             'token_type': tokens.get('token_type', 'Bearer'),
             'expires_in': tokens.get('expires_in'),
-            'scope': tokens.get('scope')
+            'scope': tokens.get('scope'),
+            'client_id': self.oauth_client_id,
+            'client_secret': self.auth.client_secret
         }
         
-        if self.auth.login_with_token(token_data):
-            self.status_text.value = "Authentication complete!"
+        auth_result = self.auth.login_with_token(token_data)
+        
+        if auth_result:
+            self.status_text.value = "✓ Authentication complete!"
+            self.status_text.color = ft.Colors.GREEN_600
             self.progress.visible = False
+            self.debug_text.value = "Loading dashboard..."
             self.page.update()
             
             time.sleep(1)
@@ -274,12 +240,14 @@ class FirebaseMobileLogin(ft.Column):
             self.status_text.color = ft.Colors.RED_600
             self.login_button.disabled = False
             self.progress.visible = False
+            self.debug_text.value = "Auth bridge failed"
             self.page.update()
     
     async def _handle_timeout(self):
         self.polling = False
-        self.status_text.value = "Timeout\n\nSign-in took too long.\nPlease try again."
+        self.status_text.value = "Timeout\n\nSign-in took too long"
         self.status_text.color = ft.Colors.ORANGE
         self.login_button.disabled = False
         self.progress.visible = False
+        self.debug_text.value = "Please try again"
         self.page.update()

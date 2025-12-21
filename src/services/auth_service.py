@@ -16,16 +16,13 @@ class GoogleAuth:
         )
         self.token_file = os.path.join(os.path.dirname(__file__), "token.pickle")
         
-        # Load client info from credentials file
         self.client_id = None
         self.client_secret = None
         self._load_client_info()
         
-        # Try to load existing credentials
         self._load_credentials()
 
     def _load_client_info(self):
-        """Load client_id and client_secret from credentials file"""
         if os.path.exists(self.credentials_file):
             try:
                 with open(self.credentials_file, 'r') as f:
@@ -39,7 +36,6 @@ class GoogleAuth:
                 print(f"❌ Error loading client info: {e}")
 
     def _load_credentials(self):
-        """Load credentials from token file if it exists"""
         if os.path.exists(self.token_file):
             try:
                 with open(self.token_file, 'rb') as token:
@@ -50,7 +46,6 @@ class GoogleAuth:
                 self.creds = None
 
     def _save_credentials(self):
-        """Save credentials to token file"""
         try:
             with open(self.token_file, 'wb') as token:
                 pickle.dump(self.creds, token)
@@ -59,28 +54,20 @@ class GoogleAuth:
             print(f"❌ Error saving token: {e}")
 
     def login_desktop(self):
-        """Perform Google OAuth login (Desktop only - uses run_local_server)"""
         if not os.path.exists(self.credentials_file):
             raise FileNotFoundError(f"Credentials file not found at {self.credentials_file}")
             
-        # Lazy import to avoid wsgiref/Android issues
         from google_auth_oauthlib.flow import InstalledAppFlow
         
         print("Starting desktop OAuth flow...")
         flow = InstalledAppFlow.from_client_secrets_file(self.credentials_file, SCOPES)
         
-        # Use port 8550 to match redirect URI
         self.creds = flow.run_local_server(port=8550)
         
-        # Save credentials for future use
         self._save_credentials()
         print("✓ Desktop login successful")
 
     def login_with_token(self, token_data):
-        """
-        Create credentials from Flet's auth token (Mobile/Web).
-        token_data: dict containing access_token, etc. from page.auth.token
-        """
         try:
             print("→ Bridging OAuth token to Google credentials")
             print(f"  Token data type: {type(token_data)}")
@@ -89,7 +76,6 @@ class GoogleAuth:
                 print("❌ Token data is not a dictionary")
                 return False
             
-            # Extract token information
             access_token = token_data.get("access_token")
             refresh_token = token_data.get("refresh_token")
             
@@ -97,14 +83,11 @@ class GoogleAuth:
                 print("❌ No access_token in token_data")
                 return False
             
-            # Get client credentials
             client_id = token_data.get("client_id") or self.client_id
             client_secret = token_data.get("client_secret") or self.client_secret
             
-            # Handle scope - can be string or list
             scope = token_data.get("scope", SCOPES)
             if isinstance(scope, str):
-                # Split space-separated scope string into list
                 scope = scope.split() if scope else SCOPES
             
             print(f"  ✓ Access token: present")
@@ -113,7 +96,6 @@ class GoogleAuth:
             print(f"  ✓ Client secret: {'present' if client_secret else 'missing'}")
             print(f"  ✓ Scopes: {', '.join(scope) if isinstance(scope, list) else scope}")
             
-            # Reconstruct Credentials object
             self.creds = Credentials(
                 token=access_token,
                 refresh_token=refresh_token,
@@ -123,10 +105,8 @@ class GoogleAuth:
                 scopes=scope
             )
             
-            # Verify credentials are valid
             if not self.creds.valid:
                 print("⚠ Created credentials are not currently valid")
-                # Try to refresh if we have a refresh token
                 if self.creds.expired and self.creds.refresh_token:
                     print("→ Attempting to refresh expired token...")
                     try:
@@ -138,7 +118,6 @@ class GoogleAuth:
             else:
                 print("✓ Credentials are valid")
             
-            # Save credentials for future use
             self._save_credentials()
             return True
             
@@ -149,11 +128,9 @@ class GoogleAuth:
             return False
 
     def is_authenticated(self):
-        """Check if user is authenticated with valid credentials"""
         if self.creds is None:
             return False
         
-        # Check if credentials are expired and refresh if needed
         if self.creds.expired:
             if self.creds.refresh_token:
                 try:
@@ -172,7 +149,6 @@ class GoogleAuth:
         return self.creds.valid
 
     def logout(self):
-        """Clear credentials and delete token file"""
         print("→ Logging out...")
         self.creds = None
         if os.path.exists(self.token_file):
@@ -183,7 +159,6 @@ class GoogleAuth:
                 print(f"❌ Error removing token file: {e}")
 
     def get_service(self):
-        """Get Google Drive service instance"""
         if not self.is_authenticated():
             print("❌ Cannot get service - not authenticated")
             return None
@@ -197,7 +172,6 @@ class GoogleAuth:
             return None
 
     def get_user_info(self):
-        """Get current user information"""
         try:
             service = self.get_service()
             if not service:
