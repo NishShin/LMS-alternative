@@ -70,16 +70,16 @@ class SubmissionManager:
         selected_folder_id = [drive_folder_id]
         
         drive_folder_name = self.todo.get_folder_name_by_id(drive_folder_id)
-        folder_display = ft.Text(f"Upload to: {drive_folder_name}", size=13, color=ft.Colors.BLUE)
+        folder_display = ft.Text(f"Upload to: {drive_folder_name}", size=13, color=ft.Colors.BLUE, overflow=ft.TextOverflow.VISIBLE, no_wrap=False)
         
         submission_text = ft.TextField(
             hint_text="Submission notes/comments",
             multiline=True,
             min_lines=3,
-            width=350
+            expand=True
         )
         
-        upload_status = ft.Text("")
+        upload_status = ft.Text("", overflow=ft.TextOverflow.VISIBLE, no_wrap=False)
         
         def update_selected_folder(fid):
             selected_folder_id[0] = fid
@@ -182,16 +182,16 @@ class SubmissionManager:
         self.todo.page.update()
         
         content = ft.Column([
-            ft.Text(f"Assignment: {assignment.get('title')}", weight=ft.FontWeight.BOLD),
-            ft.Text(f"Subject: {subject}", size=13, color=ft.Colors.BLUE),
+            ft.Text(f"Assignment: {assignment.get('title')}", weight=ft.FontWeight.BOLD, overflow=ft.TextOverflow.VISIBLE, no_wrap=False),
+            ft.Text(f"Subject: {subject}", size=13, color=ft.Colors.BLUE, overflow=ft.TextOverflow.VISIBLE, no_wrap=False),
             ft.Divider(),
             submission_text,
             ft.Container(height=10),
-            ft.Row([
-                folder_display,
-                change_folder_btn
-            ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
-            ft.Text("You can browse and select a subfolder if needed", size=11, italic=True, color=ft.Colors.GREY_600),
+            ft.ResponsiveRow([
+                ft.Column(col={"sm": 12, "md": 8}, controls=[folder_display]),
+                ft.Column(col={"sm": 12, "md": 4}, controls=[change_folder_btn])
+            ]),
+            ft.Text("You can browse and select a subfolder if needed", size=11, italic=True, color=ft.Colors.GREY_600, overflow=ft.TextOverflow.VISIBLE, no_wrap=False),
             ft.Container(height=5),
             ft.ElevatedButton(
                 "Choose File",
@@ -203,7 +203,7 @@ class SubmissionManager:
             ft.Row([
                 ft.TextButton("Close", on_click=lambda e: close_overlay(e))
             ], alignment=ft.MainAxisAlignment.END)
-        ], spacing=10)
+        ], spacing=10, scroll="auto")
         
         overlay, close_overlay = self.todo.show_overlay(
             content,
@@ -250,7 +250,7 @@ class SubmissionManager:
                 grade_field = ft.TextField(
                     value=sub.get('grade', ''),
                     label="Grade",
-                    width=100,
+                    col={"sm": 12, "md": 3},
                     border_color=ft.Colors.BLUE_400,
                     focused_border_color=ft.Colors.BLUE_700,
                     hint_text="Enter grade"
@@ -259,8 +259,8 @@ class SubmissionManager:
                 feedback_field = ft.TextField(
                     value=sub.get('feedback', ''),
                     label="Feedback",
+                    col={"sm": 12, "md": 9},
                     multiline=True,
-                    expand=True,
                     min_lines=2,
                     max_lines=4,
                     border_color=ft.Colors.BLUE_400,
@@ -268,7 +268,7 @@ class SubmissionManager:
                     hint_text="Enter feedback for student"
                 )
 
-                save_status = ft.Text("", size=12)
+                save_status = ft.Text("", size=12, overflow=ft.TextOverflow.VISIBLE, no_wrap=False)
 
                 def make_save_grade_handler(submission, grade_field_ref, feedback_field_ref, status_text_ref):
                     def save_grade(e):
@@ -340,32 +340,40 @@ class SubmissionManager:
                 
                 file_link_btn = ft.Container()
                 if sub.get('file_link'):
-                    file_link_btn = ft.Row([
-                        ft.TextButton(
-                            "Preview File",
-                            icon=ft.Icons.VISIBILITY,
-                            on_click=lambda e, fid=sub.get('file_id'), fname=sub.get('file_name', 'File'): 
-                                self._preview_file(fid, fname) if self.file_preview and fid else None
-                        ) if self.file_preview else ft.Container(),
-                        ft.TextButton(
-                            "Open in Browser",
-                            icon=ft.Icons.OPEN_IN_NEW,
-                            on_click=lambda e, link=sub['file_link']: self._open_link(link)
-                        )
+                    file_link_btn = ft.ResponsiveRow([
+                        ft.Column(col={"sm": 12, "md": 6}, controls=[
+                            ft.TextButton(
+                                "Preview File",
+                                icon=ft.Icons.VISIBILITY,
+                                on_click=lambda e, fid=sub.get('file_id'), fname=sub.get('file_name', 'File'): 
+                                    self._preview_file(fid, fname) if self.file_preview and fid else None
+                            ) if self.file_preview else ft.Container()
+                        ]),
+                        ft.Column(col={"sm": 12, "md": 6}, controls=[
+                            ft.TextButton(
+                                "Open in Browser",
+                                icon=ft.Icons.OPEN_IN_NEW,
+                                on_click=lambda e, link=sub['file_link']: self._open_link(link)
+                            )
+                        ])
                     ])
                 elif sub.get('file_id') and self.todo.drive_service:
-                    file_link_btn = ft.Row([
-                        ft.TextButton(
-                            "Preview File",
-                            icon=ft.Icons.VISIBILITY,
-                            on_click=lambda e, fid=sub['file_id'], fname=sub.get('file_name', 'File'): 
-                                self._preview_file(fid, fname) if self.file_preview else None
-                        ) if self.file_preview else ft.Container(),
-                        ft.TextButton(
-                            "Open in Browser",
-                            icon=ft.Icons.OPEN_IN_NEW,
-                            on_click=lambda e, fid=sub['file_id']: self._open_drive_file(fid)
-                        )
+                    file_link_btn = ft.ResponsiveRow([
+                        ft.Column(col={"sm": 12, "md": 6}, controls=[
+                            ft.TextButton(
+                                "Preview File",
+                                icon=ft.Icons.VISIBILITY,
+                                on_click=lambda e, fid=sub['file_id'], fname=sub.get('file_name', 'File'): 
+                                    self._preview_file(fid, fname) if self.file_preview else None
+                            ) if self.file_preview else ft.Container()
+                        ]),
+                        ft.Column(col={"sm": 12, "md": 6}, controls=[
+                            ft.TextButton(
+                                "Open in Browser",
+                                icon=ft.Icons.OPEN_IN_NEW,
+                                on_click=lambda e, fid=sub['file_id']: self._open_drive_file(fid)
+                            )
+                        ])
                     ])
                 
                 last_saved_container = ft.Container()
@@ -377,7 +385,9 @@ class SubmissionManager:
                                 f"Last updated: {sub.get('graded_at')}",
                                 size=11,
                                 color=ft.Colors.GREY_600,
-                                italic=True
+                                italic=True,
+                                overflow=ft.TextOverflow.VISIBLE,
+                                no_wrap=False
                             )
                         ], spacing=5),
                         padding=ft.padding.only(top=5)
@@ -393,35 +403,39 @@ class SubmissionManager:
                             "You can edit and update grades anytime",
                             size=10,
                             color=ft.Colors.BLUE_600,
-                            italic=True
+                            italic=True,
+                            overflow=ft.TextOverflow.VISIBLE,
+                            no_wrap=False
                         )
                     ], spacing=3),
                     padding=ft.padding.only(top=3),
-                    visible=bool(sub.get('grade'))  
+                    visible=bool(sub.get('grade'))
                 )
                 
                 card_content = ft.Column([
                     ft.Row([
                         status_icon,
-                        ft.Text(f"{student_name} ({student['email']})", weight=ft.FontWeight.BOLD),
+                        ft.Text(f"{student_name} ({student['email']})", weight=ft.FontWeight.BOLD, overflow=ft.TextOverflow.VISIBLE, no_wrap=False),
                     ]),
-                    ft.Text(status_text, size=12, color=ft.Colors.GREEN),
+                    ft.Text(status_text, size=12, color=ft.Colors.GREEN, overflow=ft.TextOverflow.VISIBLE, no_wrap=False),
                     ft.Container(
-                        content=ft.Text(timing_text, size=13, weight=ft.FontWeight.BOLD),
+                        content=ft.Text(timing_text, size=13, weight=ft.FontWeight.BOLD, overflow=ft.TextOverflow.VISIBLE, no_wrap=False),
                         bgcolor=ft.Colors.with_opacity(0.1, timing_color),
                         padding=5,
                         border_radius=5
                     ) if timing_status else ft.Container(),
-                    ft.Text(f"Notes: {sub.get('submission_text', 'No notes')}", size=12),
+                    ft.Text(f"Notes: {sub.get('submission_text', 'No notes')}", size=12, overflow=ft.TextOverflow.VISIBLE, no_wrap=False),
                     ft.Text(
                         f"File: {sub.get('file_name', 'No file')}",
                         size=12,
-                        color=ft.Colors.BLUE
+                        color=ft.Colors.BLUE,
+                        overflow=ft.TextOverflow.VISIBLE,
+                        no_wrap=False
                     ),
                     file_link_btn,
                     ft.Divider(),
                     ft.Text("Grade & Feedback:", size=13, weight=ft.FontWeight.BOLD, color=ft.Colors.BLUE_900),
-                    ft.Row([grade_field, feedback_field]),
+                    ft.ResponsiveRow([grade_field, feedback_field]),
                     ft.Row([
                         ft.ElevatedButton(
                             button_text,
@@ -443,7 +457,7 @@ class SubmissionManager:
                 status_text = "Missing"
                 card_content = ft.Row([
                     status_icon,
-                    ft.Text(f"{student_name} ({student['email']})", weight=ft.FontWeight.BOLD),
+                    ft.Text(f"{student_name} ({student['email']})", weight=ft.FontWeight.BOLD, overflow=ft.TextOverflow.VISIBLE, no_wrap=False, expand=True),
                     ft.Text(status_text, color=ft.Colors.RED, weight=ft.FontWeight.BOLD)
                 ])
                 card_border_color = ft.Colors.RED_200
@@ -460,7 +474,7 @@ class SubmissionManager:
         
         overlay, close_overlay = self.todo.show_overlay(
             submissions_list,
-            f"Submissions: {assignment['title']} ({submitted_count}/{len(target_students)})",
+            f"Submissions for: {assignment['title']} ({submitted_count}/{len(target_students)})",
             width=600,
             height=500
         )

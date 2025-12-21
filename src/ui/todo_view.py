@@ -255,7 +255,16 @@ class TodoView:
         
         header_controls = []
         if title:
-            header_controls.append(ft.Text(title, size=20, weight=ft.FontWeight.BOLD))
+            header_controls.append(
+                ft.Text(
+                    title, 
+                    size=20, 
+                    weight=ft.FontWeight.BOLD,
+                    overflow=ft.TextOverflow.VISIBLE,
+                    no_wrap=False,
+                    expand=True
+                )
+            )
         
         header_controls.append(ft.IconButton(icon=ft.Icons.CLOSE, on_click=close_overlay))
         
@@ -359,7 +368,7 @@ class TodoView:
                 content=ft.Row([
                     back_btn,
                     ft.Icon(ft.Icons.SCHOOL, size=40, color=ft.Colors.BLUE),
-                    ft.Text("Learning Management System", size=28, weight=ft.FontWeight.BOLD),
+                    ft.Text("Learning Management System", size=28, weight=ft.FontWeight.BOLD, expand=True, overflow=ft.TextOverflow.VISIBLE, no_wrap=False),
                 ], alignment=ft.MainAxisAlignment.START),
                 padding=20
             ),
