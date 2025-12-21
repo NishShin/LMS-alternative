@@ -1,33 +1,24 @@
-import json
 from pathlib import Path
+from utils.common import load_json_file, save_json_file
+import datetime
 
 
 class DataManager:
     
-    def __init__(self, data_dir: Path, drive_service=None):
-        self.data_dir = data_dir
+    def __init__(self, data_dir, drive_service=None):
+        self.data_dir = Path(data_dir) if isinstance(data_dir, str) else data_dir
         self.drive_service = drive_service
         self.lms_root_id = self._load_lms_root_id()
         
-        self.assignments_file = data_dir / "assignments.json"
-        self.students_file = data_dir / "students.json"
-        self.submissions_file = data_dir / "submissions.json"
+        self.assignments_file = self.data_dir / "assignments.json"
+        self.students_file = self.data_dir / "students.json"
+        self.submissions_file = self.data_dir / "submissions.json"
     
     def _load_lms_root_id(self):
-        
-        import os
-        config_file = "lms_config.json"
-        if os.path.exists(config_file):
-            try:
-                with open(config_file, "r", encoding="utf-8") as f:
-                    config = json.load(f)
-                    return config.get("lms_root_id")
-            except:
-                pass
-        return None
+        config = load_json_file("lms_config.json", {})
+        return config.get("lms_root_id")
     
-    def load_json(self, filepath, default=None):
-        
+    def _load_from_drive_or_local(self, filepath, default=None):
         if self.drive_service and self.lms_root_id:
             filename = filepath.name
             try:
@@ -35,27 +26,15 @@ class DataManager:
                 if file:
                     content = self.drive_service.read_file_content(file['id'])
                     if content:
+                        import json
                         return json.loads(content)
             except Exception as e:
                 print(f"Error loading from Drive: {e}")
         
-        if filepath.exists():
-            try:
-                with open(filepath, 'r', encoding='utf-8') as f:
-                    return json.load(f)
-            except:
-                pass
-        
-        return default if default is not None else []
+        return load_json_file(filepath, default)
     
-    def save_json(self, filepath, data):
-    
-        try:
-            with open(filepath, 'w', encoding='utf-8') as f:
-                json.dump(data, f, indent=2, default=str, ensure_ascii=False)
-        except Exception as e:
-            print(f"Error saving local: {e}")
-        
+    def _save_to_local_and_drive(self, filepath, data):
+        save_json_file(filepath, data)
         
         if self.drive_service and self.lms_root_id:
             filename = filepath.name
@@ -69,8 +48,7 @@ class DataManager:
                 print(f"Error saving to Drive: {e}")
     
     def load_assignments(self):
-        import datetime
-        assignments = self.load_json(self.assignments_file, [])
+        assignments = self._load_from_drive_or_local(self.assignments_file, [])
         
         modified = False
         for i, assignment in enumerate(assignments):
@@ -79,21 +57,21 @@ class DataManager:
                 modified = True
         
         if modified:
-            self.save_json(self.assignments_file, assignments)
+            self.save_assignments(assignments)
         
         return assignments
     
     def load_students(self):
-        return self.load_json(self.students_file, [])
+        return self._load_from_drive_or_local(self.students_file, [])
     
     def load_submissions(self):
-        return self.load_json(self.submissions_file, [])
+        return self._load_from_drive_or_local(self.submissions_file, [])
     
     def save_assignments(self, assignments):
-        self.save_json(self.assignments_file, assignments)
+        self._save_to_local_and_drive(self.assignments_file, assignments)
     
     def save_students(self, students):
-        self.save_json(self.students_file, students)
+        self._save_to_local_and_drive(self.students_file, students)
     
     def save_submissions(self, submissions):
-        self.save_json(self.submissions_file, submissions)
+        self._save_to_local_and_drive(self.submissions_file, submissions)

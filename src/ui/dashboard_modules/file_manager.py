@@ -1,4 +1,5 @@
 import flet as ft
+from utils.common import format_file_size, create_icon_button, show_snackbar, create_dialog, open_drive_file
 
 
 class FileManager:
@@ -22,7 +23,8 @@ class FileManager:
                     ft.Text(display_name, size=14),
                     ft.Text(f"{subfolder_count} folders", size=12, color=ft.Colors.GREY_600),
                 ], expand=True),
-                ft.IconButton(icon=ft.Icons.MORE_VERT, on_click=lambda e, f=folder: self.show_folder_menu(f, is_shared_drive)),
+                create_icon_button(ft.Icons.MORE_VERT, "More options", 
+                                  lambda e, f=folder: self.show_folder_menu(f, is_shared_drive)),
             ]),
             padding=10,
             border=ft.border.only(bottom=ft.BorderSide(1, ft.Colors.GREY_300)),
@@ -32,7 +34,18 @@ class FileManager:
     def create_file_item(self, file):
         is_folder = file.get("mimeType") == "application/vnd.google-apps.folder"
         icon = ft.Icons.FOLDER if is_folder else ft.Icons.INSERT_DRIVE_FILE
-        size_str = "Folder" if is_folder else self.format_size(file.get("size"))
+        size_str = "Folder" if is_folder else format_file_size(file.get("size"))
+
+        action_buttons = []
+        if not is_folder and self.file_preview:
+            action_buttons.append(
+                create_icon_button(ft.Icons.VISIBILITY, "Preview", 
+                                  lambda e, f=file: self.preview_file(f))
+            )
+        action_buttons.append(
+            create_icon_button(ft.Icons.MORE_VERT, "More options", 
+                              lambda e, f=file: self.show_file_menu(f))
+        )
 
         return ft.Container(
             content=ft.Row([
@@ -41,12 +54,7 @@ class FileManager:
                     ft.Text(file.get("name", "Untitled"), size=14),
                     ft.Text(size_str, size=12, color=ft.Colors.GREY_600),
                 ], expand=True),
-                ft.IconButton(
-                    icon=ft.Icons.VISIBILITY,
-                    tooltip="Preview",
-                    on_click=lambda e, f=file: self.preview_file(f)
-                ) if not is_folder and self.file_preview else ft.Container(),
-                ft.IconButton(icon=ft.Icons.MORE_VERT, on_click=lambda e, f=file: self.show_file_menu(f)),
+                *action_buttons
             ]),
             padding=10,
             border=ft.border.only(bottom=ft.BorderSide(1, ft.Colors.GREY_200)),
@@ -59,19 +67,6 @@ class FileManager:
                 file_id=file.get("id"),
                 file_name=file.get("name", "File")
             )
-    
-    def format_size(self, size):
-        try:
-            s = int(size)
-            if s < 1024:
-                return f"{s} B"
-            if s < 1024 * 1024:
-                return f"{s / 1024:.1f} KB"
-            if s < 1024 * 1024 * 1024:
-                return f"{s / (1024 * 1024):.1f} MB"
-            return f"{s / (1024 * 1024 * 1024):.1f} GB"
-        except:
-            return "Unknown size"
     
     def open_folder(self, folder, is_shared_drive=False):
         self.dash.show_folder_contents(folder["id"], folder.get("name", folder["id"]), is_shared_drive)
@@ -92,12 +87,12 @@ class FileManager:
             self.dash.page.update()
 
         def on_rename(e):
-            self.rename_file_dialog(file)
+            self._rename_file_dialog(file)
             popup.open = False
             self.dash.page.update()
 
         def on_delete(e):
-            self.delete_file_dialog(file)
+            self._delete_file_dialog(file)
             popup.open = False
             self.dash.page.update()
 
@@ -120,7 +115,7 @@ class FileManager:
         popup.open = True
         self.dash.page.update()
     
-    def rename_file_dialog(self, file):
+    def _rename_file_dialog(self, file):
         name_field = ft.TextField(value=file["name"], autofocus=True)
 
         def rename(e):
@@ -144,7 +139,7 @@ class FileManager:
         dialog.open = True
         self.dash.page.update()
     
-    def delete_file_dialog(self, file):
+    def _delete_file_dialog(self, file):
         def delete(e):
             self.dash.drive.delete_file(file["id"])
             self.dash.refresh_folder_contents()
@@ -169,7 +164,7 @@ class FileManager:
         if not info:
             return
         
-        size_str = self.format_size(info.get('size')) if info.get('size') else "N/A"
+        size_str = format_file_size(info.get('size')) if info.get('size') else "N/A"
         
         preview_button = (
             ft.ElevatedButton(
@@ -182,7 +177,7 @@ class FileManager:
         browser_button = ft.ElevatedButton(
             "Open in Browser",
             icon=ft.Icons.OPEN_IN_NEW,
-            on_click=lambda e: self._open_in_browser(info.get('id'))
+            on_click=lambda e: open_drive_file(info.get('id'))
         )
         
         content = ft.Column([
@@ -203,10 +198,6 @@ class FileManager:
         self.dash.page.dialog = dialog
         dialog.open = True
         self.dash.page.update()
-    
-    def _open_in_browser(self, file_id):
-        import webbrowser
-        webbrowser.open(f"https://drive.google.com/file/d/{file_id}/view")
     
     def create_new_folder_dialog(self):
         name_field = ft.TextField(label="Folder name", autofocus=True)
@@ -271,14 +262,3 @@ class FileManager:
         self.dash.page.overlay.append(file_picker)
         self.dash.page.update()
         file_picker.pick_files()
-    
-    def show_new_menu(self, e):
-        popup = ft.PopupMenuButton(
-            items=[
-                ft.PopupMenuItem(text="New Folder", on_click=lambda e: self.create_new_folder_dialog()),
-                ft.PopupMenuItem(text="Upload File", on_click=lambda e: self.select_file_to_upload()),
-            ]
-        )
-        self.dash.page.add(popup)
-        popup.open = True
-        self.dash.page.update()
