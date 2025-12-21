@@ -4,7 +4,6 @@ from ui.custom_control.custom_controls import ButtonWithMenu
 from ui.todo_view import TodoView
 from ui.dashboard_modules.file_manager import FileManager
 from ui.dashboard_modules.folder_navigator import FolderNavigator
-from ui.dashboard_modules.favorites_manager import FavoritesManager
 from ui.dashboard_modules.paste_links_manager import PasteLinksManager
 
 
@@ -18,7 +17,6 @@ class Dashboard:
         self.current_folder_id = "root"
         self.current_folder_name = "My Drive"
         self.folder_stack = []
-        self.selected_files = set()
         self.current_view = "your_folders"
 
         user_info = self.auth.get_user_info()
@@ -26,7 +24,6 @@ class Dashboard:
 
         self.file_manager = FileManager(self)
         self.folder_navigator = FolderNavigator(self)
-        self.favorites_manager = FavoritesManager(self)
         self.paste_links_manager = PasteLinksManager(self)
 
         self.search_field = ft.TextField(

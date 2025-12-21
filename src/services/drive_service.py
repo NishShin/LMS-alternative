@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 from functools import lru_cache
 import time
 import io
-from utils.common import extract_drive_id, format_file_size, parse_mime_type
+from utils.common import extract_drive_id, format_file_size
 
 
 class DriveService:
@@ -149,16 +149,9 @@ class DriveService:
             self._set_cache(cache_key, file)
         
         return file
-    
-    def extract_id_from_link(self, files):
-        for file in files:
-            file_id = extract_drive_id(file)
-            if file_id:
-                return file_id
-        return None
 
     def resolve_drive_link(self, link):
-        file_id = self.extract_id_from_link([link])
+        file_id = extract_drive_id(link)
         
         if not file_id:
             print(f"Could not extract file ID from link: {link}")
@@ -171,32 +164,6 @@ class DriveService:
             return None, None
         
         return file_id, info
-
-    def batch_get_file_info(self, file_ids):
-        results = {}
-        
-        def callback(request_id, response, exception):
-            if exception:
-                print(f"Error for {request_id}: {exception}")
-            else:
-                results[request_id] = response
-        
-        def make_request():
-            batch = self.service.new_batch_http_request(callback=callback)
-            
-            for file_id in file_ids:
-                batch.add(
-                    self.service.files().get(
-                        fileId=file_id,
-                        fields="id, name, mimeType, size, modifiedTime"
-                    ),
-                    request_id=file_id
-                )
-            
-            batch.execute()
-            return results
-        
-        return self._retry_request(make_request, "batch_get_file_info") or {}
     
     def _execute_file_mutation(self, operation_name, request_func, parent_id=None):
         result = self._retry_request(request_func, operation_name)
@@ -376,20 +343,3 @@ class DriveService:
             )
         
         return folders
-    
-    def get_cache_stats(self):
-        lru_stats = {}
-        if hasattr(self, '_cached_get_file_info'):
-            cache_info = self._cached_get_file_info.cache_info()
-            lru_stats = {
-                'hits': cache_info.hits,
-                'misses': cache_info.misses,
-                'maxsize': cache_info.maxsize,
-                'currsize': cache_info.currsize
-            }
-        
-        return {
-            'manual_cache_size': len(self._cache),
-            'manual_cache_keys': list(self._cache.keys()),
-            'lru_cache': lru_stats
-        }

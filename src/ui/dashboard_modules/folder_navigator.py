@@ -74,10 +74,7 @@ class FolderNavigator:
             [
                 *back_controls,
                 ft.Text(display_name, size=18, weight=ft.FontWeight.BOLD),
-                ft.Row([
-                    ft.ElevatedButton("Save to favorites", on_click=lambda e: self.dash.favorites_manager.open_save_favorite_dialog()),
-                    ft.ElevatedButton("Refresh", icon=ft.Icons.REFRESH, on_click=lambda e: self.refresh_folder_contents()),
-                ]),
+                ft.ElevatedButton("Refresh", icon=ft.Icons.REFRESH, on_click=lambda e: self.refresh_folder_contents()),
             ],
             alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
         )
