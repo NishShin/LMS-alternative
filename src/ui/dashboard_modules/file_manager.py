@@ -11,10 +11,36 @@ class FileManager:
             self.file_preview = FilePreviewService(dashboard.page, dashboard.drive)
         except ImportError:
             self.file_preview = None
-    
+
+    def show_menu(self, item, is_folder=False, is_shared_drive=False):
+        
+        def on_preview(e):
+            if not is_folder:
+                self.preview_file(item)
+
+        def on_rename(e):
+            self._rename_file_dialog(item)
+
+        def on_delete(e):
+            self._delete_file_dialog(item)
+
+        def on_info(e):
+            self.show_file_info(item)
+        
+        menu_items = [
+            ft.PopupMenuItem(text="Preview", on_click=on_preview) if self.file_preview and not is_folder else None,
+            ft.PopupMenuItem(text="Info", on_click=on_info),
+            ft.PopupMenuItem(text="Rename", on_click=on_rename),
+            ft.PopupMenuItem(text="Delete", on_click=on_delete),
+        ]
+
+        return [item for item in menu_items if item is not None]
+
     def create_folder_item(self, folder, subfolder_count, is_shared_drive=False):
         folder_name = folder.get("name", "Untitled")
         display_name = folder_name if len(folder_name) < 40 else folder_name[:37] + "..."
+        
+        menu_items = self.show_menu(folder, is_folder=True, is_shared_drive=is_shared_drive)
 
         return ft.Container(
             content=ft.Row([
@@ -23,8 +49,8 @@ class FileManager:
                     ft.Text(display_name, size=14),
                     ft.Text(f"{subfolder_count} folders", size=12, color=ft.Colors.GREY_600),
                 ], expand=True),
-                create_icon_button(ft.Icons.MORE_VERT, "More options", 
-                                  lambda e, f=folder: self.show_folder_menu(f, is_shared_drive)),
+
+                ft.PopupMenuButton(items=menu_items),
             ]),
             padding=10,
             border=ft.border.only(bottom=ft.BorderSide(1, ft.Colors.GREY_300)),
@@ -36,6 +62,7 @@ class FileManager:
         icon = ft.Icons.FOLDER if is_folder else ft.Icons.INSERT_DRIVE_FILE
         size_str = "Folder" if is_folder else format_file_size(file.get("size"))
 
+        menu_items = self.show_menu(file, is_folder=is_folder)
         action_buttons = []
         if not is_folder and self.file_preview:
             action_buttons.append(
@@ -43,8 +70,7 @@ class FileManager:
                                   lambda e, f=file: self.preview_file(f))
             )
         action_buttons.append(
-            create_icon_button(ft.Icons.MORE_VERT, "More options", 
-                              lambda e, f=file: self.show_file_menu(f))
+            ft.PopupMenuButton(items=menu_items)
         )
 
         return ft.Container(
@@ -80,41 +106,6 @@ class FileManager:
     def show_folder_menu(self, folder, is_shared_drive=False):
         self.open_folder(folder, is_shared_drive)
     
-    def show_file_menu(self, file):
-        def on_preview(e):
-            self.preview_file(file)
-            popup.open = False
-            self.dash.page.update()
-
-        def on_rename(e):
-            self._rename_file_dialog(file)
-            popup.open = False
-            self.dash.page.update()
-
-        def on_delete(e):
-            self._delete_file_dialog(file)
-            popup.open = False
-            self.dash.page.update()
-
-        def on_info(e):
-            self.show_file_info(file)
-            popup.open = False
-            self.dash.page.update()
-
-        menu_items = [
-            ft.PopupMenuItem(text="Preview", on_click=on_preview) if self.file_preview else None,
-            ft.PopupMenuItem(text="Info", on_click=on_info),
-            ft.PopupMenuItem(text="Rename", on_click=on_rename),
-            ft.PopupMenuItem(text="Delete", on_click=on_delete),
-        ]
-        
-        menu_items = [item for item in menu_items if item is not None]
-
-        popup = ft.PopupMenuButton(items=menu_items)
-        self.dash.page.add(popup)
-        popup.open = True
-        self.dash.page.update()
-    
     def _rename_file_dialog(self, file):
         name_field = ft.TextField(value=file["name"], autofocus=True)
 
@@ -123,41 +114,69 @@ class FileManager:
             if new_name and new_name != file["name"]:
                 self.dash.drive.rename_file(file["id"], new_name)
                 self.dash.refresh_folder_contents()
-            dialog.open = False
+            dialog_container.visible = False
             self.dash.page.update()
 
-        dialog = ft.AlertDialog(
-            title=ft.Text("Rename"),
-            content=name_field,
-            actions=[
-                ft.TextButton("Cancel", on_click=lambda e: self.dash.close_dialog(dialog)),
-                ft.ElevatedButton("Rename", on_click=rename)
-            ],
+        def cancel(e):
+            dialog_container.visible = False
+            self.dash.page.update()
+
+        dialog_container = ft.Container(
+            content=ft.Container(
+                content=ft.Column([
+                    ft.Text("Rename", size=20, weight=ft.FontWeight.BOLD),
+                    name_field,
+                    ft.Row([
+                        ft.TextButton("Cancel", on_click=cancel),
+                        ft.ElevatedButton("Rename", on_click=rename)
+                    ], alignment=ft.MainAxisAlignment.END),
+                ], tight=True, spacing=15),
+                padding=20,
+                bgcolor=ft.Colors.WHITE,
+                border_radius=10,
+                width=400,
+            ),
+            alignment=ft.alignment.center,
+            bgcolor=ft.Colors.with_opacity(0.5, ft.Colors.BLACK),
         )
 
-        self.dash.page.dialog = dialog
-        dialog.open = True
+        self.dash.page.overlay.append(dialog_container)
         self.dash.page.update()
     
     def _delete_file_dialog(self, file):
         def delete(e):
             self.dash.drive.delete_file(file["id"])
             self.dash.refresh_folder_contents()
-            dialog.open = False
+            dialog_container.visible = False
             self.dash.page.update()
 
-        dialog = ft.AlertDialog(
-            title=ft.Text("Confirm Delete"),
-            content=ft.Text(f"Delete '{file.get('name', '')}'?"),
-            actions=[
-                ft.TextButton("Cancel", on_click=lambda e: self.dash.close_dialog(dialog)),
-                ft.ElevatedButton("Delete", on_click=delete, bgcolor=ft.Colors.RED)
-            ],
+        def cancel(e):
+            dialog_container.visible = False
+            self.dash.page.update()
+
+        dialog_container = ft.Container(
+            content=ft.Container(
+                content=ft.Column([
+                    ft.Text("Confirm Delete", size=20, weight=ft.FontWeight.BOLD),
+                    ft.Text(f"Delete '{file.get('name', '')}'?"),
+                    ft.Row([
+                        ft.TextButton("Cancel", on_click=cancel),
+                        ft.ElevatedButton("Delete", on_click=delete, bgcolor=ft.Colors.RED)
+                    ], alignment=ft.MainAxisAlignment.END),
+                ], tight=True, spacing=15),
+                padding=20,
+                bgcolor=ft.Colors.WHITE,
+                border_radius=10,
+                width=400,
+            ),
+            alignment=ft.alignment.center,
+            bgcolor=ft.Colors.with_opacity(0.5, ft.Colors.BLACK),
         )
 
-        self.dash.page.dialog = dialog
-        dialog.open = True
+        self.dash.page.overlay.append(dialog_container)
         self.dash.page.update()
+
+
     
     def show_file_info(self, file):
         info = self.dash.drive.get_file_info(file["id"]) if isinstance(file, dict) and "id" in file else file
@@ -166,11 +185,20 @@ class FileManager:
         
         size_str = format_file_size(info.get('size')) if info.get('size') else "N/A"
         
+        def close_dialog(e):
+            dialog_container.visible = False
+            self.dash.page.update()
+        
+        def on_preview(e):
+            self.preview_file(info)
+            dialog_container.visible = False
+            self.dash.page.update()
+        
         preview_button = (
             ft.ElevatedButton(
                 "Preview",
                 icon=ft.Icons.VISIBILITY,
-                on_click=lambda e: (self.preview_file(info), setattr(dialog, 'open', False), self.dash.page.update())
+                on_click=on_preview
             ) if self.file_preview else ft.Container()
         )
         
@@ -180,24 +208,32 @@ class FileManager:
             on_click=lambda e: open_drive_file(info.get('id'))
         )
         
-        content = ft.Column([
-            ft.Text(f"Name: {info.get('name', 'N/A')}"),
-            ft.Text(f"Type: {info.get('mimeType', 'N/A')}"),
-            ft.Text(f"Size: {size_str}"),
-            ft.Text(f"Modified: {info.get('modifiedTime', 'N/A')[:10]}"),
-            ft.Divider(),
-            ft.Row([preview_button, browser_button], spacing=10)
-        ], spacing=5)
-
-        dialog = ft.AlertDialog(
-            title=ft.Text("File Information"), 
-            content=content, 
-            actions=[ft.TextButton("Close", on_click=lambda e: self.dash.close_dialog(dialog))]
+        dialog_container = ft.Container(
+            content=ft.Container(
+                content=ft.Column([
+                    ft.Text("File Information", size=20, weight=ft.FontWeight.BOLD),
+                    ft.Text(f"Name: {info.get('name', 'N/A')}"),
+                    ft.Text(f"Type: {info.get('mimeType', 'N/A')}"),
+                    ft.Text(f"Size: {size_str}"),
+                    ft.Text(f"Modified: {info.get('modifiedTime', 'N/A')[:10]}"),
+                    ft.Divider(),
+                    ft.Row([preview_button, browser_button], spacing=10),
+                    ft.Row([
+                        ft.TextButton("Close", on_click=close_dialog)
+                    ], alignment=ft.MainAxisAlignment.END),
+                ], tight=True, spacing=10),
+                padding=20,
+                bgcolor=ft.Colors.WHITE,
+                border_radius=10,
+                width=400,
+            ),
+            alignment=ft.alignment.center,
+            bgcolor=ft.Colors.with_opacity(0.5, ft.Colors.BLACK),
         )
 
-        self.dash.page.dialog = dialog
-        dialog.open = True
+        self.dash.page.overlay.append(dialog_container)
         self.dash.page.update()
+
     
     def create_new_folder_dialog(self):
         name_field = ft.TextField(label="Folder name", autofocus=True)
