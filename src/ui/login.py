@@ -1,5 +1,4 @@
 import flet as ft
-import time
 import traceback
 
 
@@ -72,15 +71,13 @@ class LoginBase(ft.Column):
 
     def handle_success(self):
         self.update_status("Login successful!", ft.Colors.GREEN_600)
-        print("✓ Login successful")
         if self.on_success:
             self.on_success()
 
     def handle_error(self, error, context="Login"):
         error_msg = str(error)
         self.update_status(f"{context} failed: {error_msg[:50]}...", ft.Colors.RED_600, False)
-        print(f"{context} error: {error}")
-        print(f"Traceback:\n{traceback.format_exc()}")
+        print(f"{context} error: {error}\n{traceback.format_exc()}")
 
     def handle_login(self, e):
         raise NotImplementedError("Subclasses must implement handle_login")
@@ -98,10 +95,6 @@ class LoginView(LoginBase):
             ft.PagePlatform.MACOS
         ]
 
-        print(f"\n{'='*60}")
-        print(f"Login initiated - Platform: {self.page.platform}")
-        print(f"{'='*60}")
-
         if is_desktop:
             self._handle_desktop_login()
         else:
@@ -111,7 +104,6 @@ class LoginView(LoginBase):
         self.update_status("Opening browser for authentication...", disable_button=True)
         
         try:
-            print("→ Starting desktop OAuth flow...")
             self.auth.login_desktop()
             
             if self.auth.is_authenticated():
@@ -125,9 +117,7 @@ class LoginView(LoginBase):
     def _handle_mobile_login(self):
         import urllib.parse
         
-        print("→ Mobile OAuth flow")
-        self.update_status(f"Mobile OAuth Flow\nPlatform: {self.page.platform}\nChecking provider...", disable_button=True)
-        time.sleep(1)
+        self.update_status("Opening browser...", disable_button=True)
         
         try:
             auth_url = "https://accounts.google.com/o/oauth2/v2/auth"
@@ -142,27 +132,9 @@ class LoginView(LoginBase):
             
             oauth_url = f"{auth_url}?{urllib.parse.urlencode(params)}"
             
-            print(f"→ OAuth URL built")
-            print(f"  Client ID: {self.provider.client_id[:30]}...")
-            print(f"  Redirect URL: {self.provider.redirect_url}")
-            
-            self.update_status(
-                f"Opening browser...\n\nRedirect URI:\n{self.provider.redirect_url}\n\n"
-                "If you get 'redirect_uri_mismatch',\nadd this EXACT URL to Google Cloud Console",
-                ft.Colors.ORANGE
-            )
-            time.sleep(3)
-            
-            print("→ Launching browser...")
             self.page.launch_url(oauth_url)
-            print("✓ Browser launch requested")
             
-            self.update_status(
-                "✓ Browser should open!\n\n1. Sign in with Google\n2. You'll see 'Login Successful!'\n"
-                "3. Close browser\n4. Return to app\n\nNote: Auto-login not available on mobile",
-                ft.Colors.BLUE_600,
-                False
-            )
+            self.update_status("Complete sign-in in browser, then return to app", ft.Colors.BLUE_600, False)
             
             self.page.snack_bar = ft.SnackBar(
                 content=ft.Text("Browser opening... Complete sign-in, then return here."),

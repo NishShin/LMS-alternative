@@ -1,5 +1,4 @@
 import flet as ft
-import time
 import urllib.parse
 import urllib.request
 import json
@@ -26,7 +25,6 @@ class FirebaseMobileLogin(ft.Column):
         
         self.status_text = None
         self.login_button = None
-        self.debug_text = None
         self.progress = None
         
         self._build_ui()
@@ -46,9 +44,6 @@ class FirebaseMobileLogin(ft.Column):
         
         self.status_text = ft.Text("Sign in with your Google account", color=ft.Colors.GREY_700, text_align=ft.TextAlign.CENTER)
         self.controls.append(self.status_text)
-        
-        self.debug_text = ft.Text("", size=10, color=ft.Colors.GREY_500, text_align=ft.TextAlign.CENTER)
-        self.controls.append(self.debug_text)
         
         self.login_button = ft.ElevatedButton(
             text="Sign in with Google",
@@ -92,30 +87,23 @@ class FirebaseMobileLogin(ft.Column):
         self.login_button.disabled = True
         self.progress.visible = True
         self.page.update()
-        time.sleep(2)
         
         try:
             oauth_url = self._build_oauth_url()
             
-            self.update_status("Opening browser...\n\nSign in and return to app", ft.Colors.ORANGE)
-            time.sleep(1)
-            
             self.page.launch_url(oauth_url)
             
-            self.update_status("✓ Browser opened!\n\nWaiting for sign-in...", ft.Colors.BLUE_600)
-            self.debug_text.value = f"Session: {self.session_id[:8]}..."
+            self.update_status("Waiting for sign-in...", ft.Colors.BLUE_600)
             self.page.update()
             
             self._start_polling()
             
         except Exception as ex:
             import traceback
-            error_msg = str(ex)
-            self.update_status(f"Error: {error_msg[:50]}...", ft.Colors.RED_600)
+            self.update_status(f"Error: {str(ex)[:50]}...", ft.Colors.RED_600)
             self.login_button.disabled = False
             self.progress.visible = False
-            print(f"Mobile login error: {ex}")
-            print(f"Traceback:\n{traceback.format_exc()}")
+            print(f"Mobile login error: {ex}\n{traceback.format_exc()}")
     
     def _build_oauth_url(self):
         auth_url = "https://accounts.google.com/o/oauth2/v2/auth"
@@ -127,16 +115,6 @@ class FirebaseMobileLogin(ft.Column):
             'state': self.session_id
         }
         return f"{auth_url}?{urllib.parse.urlencode(params)}"
-    
-    def _log(self, msg):
-        try:
-            self.page.run_task(self._update_debug, msg)
-        except:
-            pass
-    
-    async def _update_debug(self, msg):
-        self.debug_text.value = msg
-        self.page.update()
     
     def _start_polling(self):
         self.polling = True
@@ -150,7 +128,6 @@ class FirebaseMobileLogin(ft.Column):
                 
                 try:
                     check_url = f"https://lms-callback.vercel.app/api/token/{self.session_id}"
-                    self._log(f"Check #{attempt+1}/60")
                     
                     req = urllib.request.Request(check_url)
                     req.add_header('Accept', 'application/json')
@@ -163,26 +140,20 @@ class FirebaseMobileLogin(ft.Column):
                             if data.get('success') and data.get('token'):
                                 token_info = data['token']
                                 if token_info.get('access_token'):
-                                    self._log("✓ Token found!")
                                     self.page.run_task(self._handle_tokens, token_info)
                                     return
                             
-                            self._log(f"Check #{attempt+1}: Waiting...")
-                            
-                    except urllib.error.HTTPError as he:
-                        if he.code == 404:
-                            self._log(f"Check #{attempt+1}: Not ready")
-                        else:
-                            self._log(f"Check #{attempt+1}: HTTP {he.code}")
-                            
+                    except urllib.error.HTTPError:
+                        pass
                     except Exception:
-                        self._log(f"Check #{attempt+1}: Connection issue")
+                        pass
                     
+                    import time
                     time.sleep(5)
                     attempt += 1
                     
                 except Exception:
-                    self._log(f"Check #{attempt+1}: Error")
+                    import time
                     time.sleep(5)
                     attempt += 1
             
@@ -194,16 +165,13 @@ class FirebaseMobileLogin(ft.Column):
     
     async def _update_waiting_status(self, attempt):
         dots = "." * ((attempt % 3) + 1)
-        self.status_text.value = f"Waiting for sign-in{dots}\nCheck #{attempt + 1}/60"
-        self.status_text.size = 14
-        self.status_text.weight = ft.FontWeight.NORMAL
+        self.status_text.value = f"Waiting for sign-in{dots}"
         self.page.update()
     
     async def _handle_tokens(self, tokens):
         self.polling = False
         
-        self.update_status("✓ Token received!\n\nAuthenticating...", ft.Colors.GREEN_600)
-        self.debug_text.value = "Processing..."
+        self.update_status("Authenticating...", ft.Colors.GREEN_600)
         self.page.update()
         
         token_data = {
@@ -218,26 +186,21 @@ class FirebaseMobileLogin(ft.Column):
         auth_result = self.auth.login_with_token(token_data)
         
         if auth_result:
-            self.update_status("✓ Authentication complete!", ft.Colors.GREEN_600)
+            self.update_status("Authentication complete!", ft.Colors.GREEN_600)
             self.progress.visible = False
-            self.debug_text.value = "Loading dashboard..."
             self.page.update()
-            
-            time.sleep(1)
             
             if self.on_success:
                 self.on_success()
         else:
-            self.update_status("Authentication failed\n\nPlease try again", ft.Colors.RED_600)
+            self.update_status("Authentication failed", ft.Colors.RED_600)
             self.login_button.disabled = False
             self.progress.visible = False
-            self.debug_text.value = "Auth bridge failed"
             self.page.update()
     
     async def _handle_timeout(self):
         self.polling = False
-        self.update_status("Timeout\n\nSign-in took too long", ft.Colors.ORANGE)
+        self.update_status("Timeout - Sign-in took too long", ft.Colors.ORANGE)
         self.login_button.disabled = False
         self.progress.visible = False
-        self.debug_text.value = "Please try again"
         self.page.update()

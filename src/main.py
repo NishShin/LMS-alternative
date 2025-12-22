@@ -1,7 +1,6 @@
 import os
 import sys
 import json
-import time
 import flet as ft
 
 
@@ -19,7 +18,6 @@ def setup_paths():
 def repair_filesystem(cwd):
     try:
         files = os.listdir(cwd)
-        fixed_any = False
         for filename in files:
             if "\\" in filename:
                 new_path = filename.replace("\\", os.sep)
@@ -28,12 +26,10 @@ def repair_filesystem(cwd):
                     os.makedirs(dir_name, exist_ok=True)
                 try:
                     os.rename(filename, new_path)
-                    fixed_any = True
                 except OSError:
                     pass
-        return fixed_any
     except Exception:
-        return False
+        pass
 
 
 def load_credentials(app_path, cwd):
@@ -66,87 +62,37 @@ def load_credentials(app_path, cwd):
     return None
 
 
-def get_redirect_url(platform):
-    is_mobile = platform in [ft.PagePlatform.ANDROID, ft.PagePlatform.IOS]
-    
-    if is_mobile:
-        return "https://lms-callback.vercel.app/firebase_callback_v2.html"
-    else:
-        return "http://localhost:8550/oauth_callback"
-
-
-def create_system_check_ui(page):
-    log_column = ft.Column(scroll=ft.ScrollMode.AUTO)
-    page.add(ft.Container(content=log_column, expand=True))
-    
-    def log(msg, color=ft.Colors.GREEN):
-        log_column.controls.append(ft.Text(msg, color=color, size=14, font_family="monospace"))
-        page.update()
-        print(msg)
-    
-    return log
+def get_redirect_url():
+    return "http://localhost:8550/oauth_callback"
 
 
 def main(page: ft.Page):
-    page.title = "System Check"
-    page.bgcolor = ft.Colors.BLACK
-    page.padding = 20
-    
-    log = create_system_check_ui(page)
-    
-    log("1. Application Started", ft.Colors.CYAN)
+    page.title = "LMS Alternative"
+    page.theme_mode = ft.ThemeMode.LIGHT
+    page.bgcolor = ft.Colors.WHITE
+    page.padding = 0
     
     try:
-        log("2. Setting up paths...")
         app_path, cwd = setup_paths()
-        log(f"Paths configured")
+        repair_filesystem(cwd)
         
-        log("3. Running Filesystem Repair...", ft.Colors.CYAN)
-        fixed = repair_filesystem(cwd)
-        if fixed:
-            log("Filesystem repairs completed", ft.Colors.GREEN)
-        else:
-            log("No repairs needed", ft.Colors.GREEN)
-        
-        log("4. Importing Modules...", ft.Colors.CYAN)
         from services.auth_service import GoogleAuth
         from ui.dashboard import Dashboard
         from ui.login import LoginView
         
         try:
             from ui.firebase_mobile_login import FirebaseMobileLogin
-            log("Firebase mobile login available")
         except ImportError:
             FirebaseMobileLogin = None
-            log("Firebase mobile login not found (optional)", ft.Colors.YELLOW)
         
-        log("All modules imported")
-        
-        log("5. Loading Credentials...", ft.Colors.CYAN)
         creds = load_credentials(app_path, cwd)
-        
         if not creds:
-            log("ERROR: web.json not found!", ft.Colors.RED)
+            page.add(ft.Text("ERROR: web.json not found!", color=ft.Colors.RED))
+            page.update()
             return
 
-        log(f"Credentials loaded")
-
-        redirect_url = get_redirect_url(page.platform)
-        log(f"Platform: {page.platform.value if hasattr(page.platform, 'value') else page.platform}")
-        log(f"Redirect URL: {redirect_url}", ft.Colors.GREEN)
-        
-        log("6. Initializing Auth Service...", ft.Colors.CYAN)
+        redirect_url = get_redirect_url()
         auth_service = GoogleAuth(credentials_file=creds['path'])
-        log("Auth Service initialized", ft.Colors.GREEN)
-        
-        log("7. All checks passed! Launching app...", ft.Colors.CYAN)
-        time.sleep(2)
-        
-        page.controls.clear()
-        page.title = "LMS Alternative"
-        page.theme_mode = ft.ThemeMode.LIGHT
-        page.bgcolor = ft.Colors.WHITE
-        page.padding = 0
         
         from flet.auth.providers import GoogleOAuthProvider
         
@@ -158,34 +104,23 @@ def main(page: ft.Page):
         provider.scopes = ["openid", "email", "profile"]
         
         def handle_on_login(e):
-            print("=" * 60)
-            print("OAuth Callback Received")
-            print("=" * 60)
-            
             if e.error:
-                print(f"Login error: {e.error}")
                 show_snackbar(f"Login Error: {e.error}")
                 return
             
             if not hasattr(page.auth, 'token') or not page.auth.token:
-                print("No auth token received")
                 show_snackbar("Authentication failed: No token received")
                 return
             
             token_data = page.auth.token
-            print(f"Token received - Type: {type(token_data)}")
             
             if isinstance(token_data, dict):
-                print(f"Token keys: {list(token_data.keys())}")
                 token_data['client_id'] = creds['client_id']
                 token_data['client_secret'] = creds['client_secret']
             
-            print("Bridging token to auth service...")
             if auth_service.login_with_token(token_data):
-                print("Authentication successful!")
                 show_dashboard()
             else:
-                print("Failed to bridge token")
                 show_snackbar("Authentication failed: Could not complete login")
         
         page.on_login = handle_on_login
@@ -202,7 +137,6 @@ def main(page: ft.Page):
             page.update()
         
         def handle_logout():
-            print("Logging out...")
             auth_service.logout()
             if hasattr(page.auth, 'logout'):
                 page.auth.logout()
@@ -214,8 +148,6 @@ def main(page: ft.Page):
             is_mobile = page.platform in [ft.PagePlatform.ANDROID, ft.PagePlatform.IOS]
             
             if is_mobile and FirebaseMobileLogin:
-                print("Using Firebase mobile login")
-                
                 firebase_config_path = os.path.join(app_path, "services", "firebase_config.json")
                 if not os.path.exists(firebase_config_path):
                     firebase_config_path = os.path.join(cwd, "services", "firebase_config.json")
@@ -233,30 +165,21 @@ def main(page: ft.Page):
                     on_success=show_dashboard
                 ))
             else:
-                print("Using standard OAuth login")
                 page.add(LoginView(page, provider, auth_service, on_success=show_dashboard))
             
             page.update()
         
-        print("\n" + "=" * 60)
-        print("LMS Alternative Starting")
-        print("=" * 60)
-        print(f"Platform: {page.platform}")
-        
         if auth_service.is_authenticated():
-            print("✓ User already authenticated")
             show_dashboard()
         else:
-            print("→ Showing login screen")
             show_login()
             
     except Exception as e:
         import traceback
         error_msg = traceback.format_exc()
-        log(f"CRITICAL ERROR: {e}", ft.Colors.RED)
-        log(f"Traceback:\n{error_msg}", ft.Colors.RED)
+        page.add(ft.Text(f"CRITICAL ERROR: {e}", color=ft.Colors.RED))
+        page.update()
         print(f"CRITICAL ERROR:\n{error_msg}")
-        time.sleep(10)
 
 
 if __name__ == "__main__":
