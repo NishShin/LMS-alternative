@@ -268,11 +268,20 @@ class TodoView:
         
         header_controls.append(ft.IconButton(icon=ft.Icons.CLOSE, on_click=close_overlay))
         
+        if height and isinstance(content, ft.Column) and content.scroll:
+            content_wrapper = ft.Container(
+                content=content,
+                expand=True,
+                padding=10
+            )
+        else:
+            content_wrapper = content
+        
         overlay_content = ft.Column([
             ft.Row(header_controls, alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
             ft.Divider(),
-            content
-        ], tight=True, spacing=10)
+            content_wrapper
+        ], tight=True, spacing=10, expand=True if height else False)
         
         overlay = ft.Container(
             content=ft.Container(
@@ -293,7 +302,7 @@ class TodoView:
         self.page.overlay.append(overlay)
         self.page.update()
         return overlay, close_overlay
-    
+
     def get_view(self):
 
         self.display_assignments()
@@ -379,11 +388,12 @@ class TodoView:
                     self.mode_switch,
                     self.settings_btn,
                     ft.Container(expand=True),
-                    self.manage_students_btn
+                    self.manage_students_btn,
+                    
                 ]),
                 padding=10,
                 bgcolor=ft.Colors.with_opacity(0.1, ft.Colors.BLUE),
-                border_radius=10
+                border_radius=10,
             ),
             
             self.student_selector_row,
