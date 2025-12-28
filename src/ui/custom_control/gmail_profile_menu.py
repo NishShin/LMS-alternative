@@ -2,13 +2,15 @@ import flet as ft
 
 
 class GmailProfileMenu:
-    def __init__(self, page, user_info, on_logout, on_add_account=None, on_switch_account=None, saved_accounts=None):
+    def __init__(self, page, user_info, on_logout, on_add_account=None, on_switch_account=None, on_remove_account=None, saved_accounts=None, account_manager=None):
         self.page = page
         self.user_info = user_info
         self.on_logout = on_logout
         self.on_add_account = on_add_account
         self.on_switch_account = on_switch_account
+        self.on_remove_account = on_remove_account
         self.saved_accounts = saved_accounts or []
+        self.account_manager = account_manager
         self.menu_open = False
         
         self.user_name = (
@@ -89,28 +91,82 @@ class GmailProfileMenu:
         if self.saved_accounts:
             for account_email in self.saved_accounts:
                 if account_email != self.user_email:
-                    account_initials = self._get_initials(account_email.split("@")[0])
+                    account_data = self.account_manager.get_account(account_email) if self.account_manager else None
+                    account_user_info = account_data.get("user_info") if account_data else {}
+                    has_saved_creds = self.account_manager.has_saved_credentials(account_email) if self.account_manager else False
+                    
+                    account_name = (
+                        account_user_info.get("displayName") or 
+                        account_user_info.get("name") or 
+                        account_email.split("@")[0]
+                    )
+                    account_pic_url = account_user_info.get("photoLink") or account_user_info.get("picture")
+                    account_initials = self._get_initials(account_name)
+                    
+                    if account_pic_url:
+                        avatar = ft.Container(
+                            width=32,
+                            height=32,
+                            border_radius=16,
+                            content=ft.Image(
+                                src=account_pic_url,
+                                width=32,
+                                height=32,
+                                fit=ft.ImageFit.COVER,
+                                border_radius=16,
+                            ),
+                        )
+                    else:
+                        avatar = ft.Container(
+                            width=32,
+                            height=32,
+                            border_radius=16,
+                            bgcolor=ft.Colors.GREY_400,
+                            content=ft.Text(
+                                account_initials,
+                                size=13,
+                                weight=ft.FontWeight.BOLD,
+                                color=ft.Colors.WHITE,
+                            ),
+                            alignment=ft.alignment.center,
+                        )
+                    
+                    status_badge = ft.Icon(
+                        ft.Icons.CHECK_CIRCLE if has_saved_creds else ft.Icons.LOGIN,
+                        size=16,
+                        color=ft.Colors.GREEN if has_saved_creds else ft.Colors.ORANGE,
+                        tooltip="Saved credentials" if has_saved_creds else "Re-login required"
+                    )
+                    
+                    account_row = ft.Row([
+                        ft.Container(
+                            content=ft.Row([
+                                avatar,
+                                ft.Column([
+                                    ft.Text(account_name, size=14, weight=ft.FontWeight.W_500),
+                                    ft.Text(account_email, size=12, color=ft.Colors.GREY_700),
+                                ], spacing=0),
+                                status_badge,
+                            ], spacing=12),
+                            expand=True,
+                            on_click=lambda e, email=account_email: self.handle_switch_account(email),
+                            ink=True,
+                        ),
+                        ft.Container(
+                            content=ft.IconButton(
+                                icon=ft.Icons.CLOSE,
+                                icon_size=16,
+                                tooltip="Remove account",
+                                on_click=lambda e, email=account_email: self.show_remove_confirmation(email),
+                            ),
+                            width=40,
+                        ),
+                    ], spacing=0)
+                    
                     menu_controls.append(
                         ft.Container(
                             padding=ft.padding.symmetric(horizontal=16, vertical=8),
-                            content=ft.Row([
-                                ft.Container(
-                                    width=32,
-                                    height=32,
-                                    border_radius=16,
-                                    bgcolor=ft.Colors.GREY_400,
-                                    content=ft.Text(
-                                        account_initials,
-                                        size=13,
-                                        weight=ft.FontWeight.BOLD,
-                                        color=ft.Colors.WHITE,
-                                    ),
-                                    alignment=ft.alignment.center,
-                                ),
-                                ft.Text(account_email, size=14, expand=True),
-                            ], spacing=12),
-                            on_click=lambda e, email=account_email: self.handle_switch_account(email),
-                            ink=True,
+                            content=account_row,
                         )
                     )
         
@@ -141,7 +197,7 @@ class GmailProfileMenu:
         ])
         
         menu_content = ft.Container(
-            width=320,
+            width=350,
             bgcolor=ft.Colors.WHITE,
             border_radius=16,
             padding=0,
@@ -154,6 +210,7 @@ class GmailProfileMenu:
                 controls=menu_controls,
                 spacing=0,
                 tight=True,
+                scroll=ft.ScrollMode.AUTO,
             ),
         )
         
@@ -195,6 +252,42 @@ class GmailProfileMenu:
         if self.on_switch_account:
             self.on_switch_account(email)
     
+    def show_remove_confirmation(self, email):
+        def confirm_remove(e):
+            try:
+                if self.account_manager:
+                    self.account_manager.remove_account(email)
+                    try:
+                        self.saved_accounts = self.account_manager.get_all_accounts()
+                    except Exception:
+                        self.saved_accounts = [a for a in self.saved_accounts if a != email]
+            except Exception as ex:
+                print(f"[ERROR] Failed to remove account {email}: {ex}")
+            dialog.open = False
+            self.page.update()
+            self.hide_menu()
+            self.show_menu()
+
+        def cancel_remove(e):
+            dialog.open = False
+            self.page.update()
+
+        dialog = ft.AlertDialog(
+            modal=False,
+            title=ft.Text("Remove Account"),
+            content=ft.Text(f"Are you sure you want to remove {email}?"),
+            actions=[
+                ft.TextButton("Cancel", on_click=cancel_remove),
+                ft.TextButton("Remove", on_click=confirm_remove),
+            ],
+        )
+        self.page.dialog = dialog
+        dialog.open = True
+        self.page.update()
+
+    def handle_remove_account(self, email):
+        self.show_remove_confirmation(email)
+            
     def _create_profile_avatar(self, size=36):
         if self.profile_pic_url:
             return ft.Container(
