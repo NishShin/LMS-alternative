@@ -224,4 +224,4 @@ local_only/
 lms_data/
 
 saved_links.json
-firebase_config.json
+firebase_config.jsonstorage/accounts.json
