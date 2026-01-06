@@ -141,19 +141,52 @@ flet main.py
 
 ```
 capstone/
-├── main.py                 # Application entry point
+├── src/
+│   ├──main.py              # Application entry point
+│   ├── assets/
+│   │   ├── icon_android.png
+│   │   ├── icon.png
+│   │   └── splash_android.png
+│   ├── services/
+│   │   ├── auth_service.py     # Google OAuth authentication
+│   │   ├── credentials.json    # OAuth credentials (you provide)
+│   │   ├── drive_service.py    # Google Drive API operations
+│   │   ├── fcm_integration.py
+│   │   ├── fcm_service.py
+│   │   ├── file_preview_service.py
+│   │   ├── firebase_config.json
+│   │   ├── firebase-admin-credentials.json
+│   │   ├── notification_service.py
+│   │   ├── token.pickle        # Auth token (auto-generated)
+│   │   └── web.json
+│   ├── ui/
+│   │   ├── custom_control/     # Custom UI components
+│   │   │   ├── __init__.py
+│   │   │   ├── custom_controls.py
+│   │   │   ├── gmail_profile_menu.py
+│   │   │   └── multi_account_manager.py
+│   │   ├── dashboard_modules/ 
+│   │   │   ├── __init__.py
+│   │   │   ├── file_manager.py
+│   │   │   ├── folder_navigator.py
+│   │   │   └── paste_links_manager.py
+│   │   ├── todo_modules/
+│   │   │   ├── __init__.py
+│   │   │   ├── assignment_manager.py
+│   │   │   ├── data_manager.py
+│   │   │   ├── storage_manager.py
+│   │   │   ├── student_manager.py
+│   │   │   └── submission_manager.py
+│   │   ├── __init__.py
+│   │   ├── firebase_mobile_login.py
+│   │   ├── login.py            # Login screen
+│   │   ├── todo_view.py
+│   │   └── dashboard.py        # Main dashboard UI
+│   ├── utils/
+│   │   └── common.py
 ├── README.md               # Project Overview
 ├── saved_links.json        # Saved Drive links (auto-generated)
 ├── favorites.json          # Saved favorites (auto-generated)
-├── services/
-│   ├── auth_service.py     # Google OAuth authentication
-│   ├── drive_service.py    # Google Drive API operations
-│   ├── credentials.json    # OAuth credentials (you provide)
-│   └── token.pickle        # Auth token (auto-generated)
-├── ui/
-│   ├── dashboard.py        # Main dashboard UI
-│   ├── login.py            # Login screen
-│   └── custom_control/     # Custom UI components
 └── venv/                   # Virtual environment
 ```
 
